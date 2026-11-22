@@ -139,7 +139,8 @@ onAuthStateChanged(authService, async (user) => {
 if (user) {
 const currentUserId = user.uid;
 setUserId(currentUserId);
-const userDocRef = doc(firestore, artifacts/${appId}/users/${currentUserId}/userProfile, 'profile');
+const userDocRef = doc(firestore, `artifacts/${appId}/users/${currentUserId}/userProfile`, 'profile');
+
 const userDocSnap = await getDoc(userDocRef);
 if (userDocSnap.exists()) {
 setUserProfile(userDocSnap.data());
