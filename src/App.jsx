@@ -101,14 +101,14 @@ function App() {
   const [message, setMessage] = useState('');
   const [enteredMobile, setEnteredMobile] = useState('');
 
-  // আপনার Firebase প্রজেক্টের কনফিগারেশন এখানে বসাবেন
+  // আপনার Firebase প্রজেক্টের আসল কনফিগারেশন বসানো হয়েছে
   const defaultFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyB02LNjfuOva_WN3QMF9EZbSx01W8fxBz8",
+    authDomain: "nirman-zone.firebaseapp.com",
+    projectId: "nirman-zone",
+    storageBucket: "nirman-zone.firebasestorage.app",
+    messagingSenderId: "964321389020",
+    appId: "1:964321389020:web:f12bb2884561e91b6bc719"
   };
 
   const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
@@ -436,9 +436,4 @@ function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile,
         >
           <option value="">নির্বাচন করুন</option>
           <option value="সেবাপ্রার্থী">সেবাপ্রার্থী (কাজ করাবেন - সম্পূর্ণ ফ্রি)</option>
-          <option value="সেবাপ্রদানকারী">সেবাপ্রদানকারী (মিস্ত্রি/ইঞ্জিনিয়ার/দোকানদার - ৫০ টাকা / ৩ মাস)</option>
-        </select>
-      </div>
-
-      <div className="mb-4">
-  
+          <option value="সেবাপ্রদানকারী">সেবাপ্রদানকারী (মিস্ত্রি/ইঞ্জিনিয়ার/দোকানদার - ৫০ টাকা / ৩ মাস)</opti
