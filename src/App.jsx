@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -88,7 +87,6 @@ const bangladeshLocations = {
 "বরগুনা": ["বরগুনা সদর উপজেলা", "পাথরঘাটা উপজেলা", "আমতলী উপজেলা", "অন্যান্য উপজেলা"]
 }
 };
-// মূল অ্যাপ কম্পোনেন্ট
 function App() {
 const [db, setDb] = useState(null);
 const [auth, setAuth] = useState(null);
@@ -98,7 +96,6 @@ const [currentPage, setCurrentPage] = useState('auth');
 const [loading, setLoading] = useState(true);
 const [message, setMessage] = useState('');
 const [enteredMobile, setEnteredMobile] = useState('');
-// আপনার Firebase প্রজেক্টের কনফিগারেশন এখানে বসাবেন
 const defaultFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
 apiKey: "YOUR_API_KEY",
 authDomain: "YOUR_AUTH_DOMAIN",
@@ -109,14 +106,12 @@ appId: "YOUR_APP_ID"
 };
 const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'nirman-zone-prod';
-// নোটিফিকেশন মেসেজ ৫ সেকেন্ড পর স্বয়ংক্রিয়ভাবে লুকানো
 useEffect(() => {
 if (message) {
 const timer = setTimeout(() => setMessage(''), 5000);
 return () => clearTimeout(timer);
 }
 }, [message]);
-// Firebase ইনিশিয়ালাইজেশন এবং অথেনটিকেশন স্টেট পর্যবেক্ষণ
 useEffect(() => {
 const initializeFirebase = async () => {
 try {
@@ -139,8 +134,7 @@ onAuthStateChanged(authService, async (user) => {
 if (user) {
 const currentUserId = user.uid;
 setUserId(currentUserId);
-const userDocRef = doc(firestore, `artifacts/${appId}/users/${currentUserId}/userProfile`, 'profile');
-
+const userDocRef = doc(firestore, artifacts/${appId}/users/${currentUserId}/userProfile, 'profile');
 const userDocSnap = await getDoc(userDocRef);
 if (userDocSnap.exists()) {
 setUserProfile(userDocSnap.data());
@@ -163,7 +157,6 @@ setLoading(false);
 };
 initializeFirebase();
 }, [initialAuthToken, appId]);
-// লগআউট হ্যান্ডলার
 const handleLogout = async () => {
 if (auth) {
 try {
@@ -228,7 +221,6 @@ setMessage={setMessage}
 </div>
 );
 }
-// লগইন / নিবন্ধন পেজ
 function AuthPage({ db, userId, appId, setUserProfile, setCurrentPage, setMessage, setEnteredMobile }) {
 const [mobileNumber, setMobileNumber] = useState('');
 const [checking, setChecking] = useState(false);
@@ -290,7 +282,6 @@ className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 r
 </div>
 );
 }
-// প্রোফাইল তৈরির পেজ
 function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile, setCurrentPage, setMessage }) {
 const [userType, setUserType] = useState('');
 const [fullName, setFullName] = useState('');
@@ -469,4 +460,16 @@ onChange={(e) => { setUnionOrWardType(e.target.value); setUnionOrWardName(''); }
 <div>
 <label className="block text-gray-700 text-sm font-medium mb-1">{unionOrWardType}-এর নাম:</label>
 <select
-className="border rounded-xl w-full py-2.5 px-3 text-gra
+className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
+value={unionOrWardName}
+onChange={(e) => setUnionOrWardName(e.target.value)}
+>
+<option value="">নির্বাচন করুন</option>
+{getSimulatedAreaNames(unionOrWardType).map((name) => <option key={name} value={name}>{name}</option>)}
+</select>
+</div>
+)}
+</div>
+)}
+{unionOrWardName && (
+<div className="m
