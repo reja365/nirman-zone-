@@ -432,4 +432,4 @@ function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile,
 
       setUserProfile(profileData);
       setCurrentPage('dashboard');
-   
+      export default App;
