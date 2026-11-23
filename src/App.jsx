@@ -7,7 +7,7 @@ import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, qu
 const ADMIN_BKASH_NUMBER = "01944121530";
 const ADMIN_NAGAD_NUMBER = "01944121530";
 const ADMIN_LOGIN_NUMBER = "01944121530";
-const ADMIN_SECRET_PIN = "2580"; // আপনার গোপন অ্যাডমিন পিন (চাইলে পরিবর্তন করতে পারেন)
+const ADMIN_SECRET_PIN = "4829"; // আপনার গোপন অ্যাডমিন পিন (চাইলে পরিবর্তন করতে পারেন)
 const SAVED_MOBILE_KEY = "nirman_zone_logged_in_mobile";
 
 // বাংলাদেশের বিভাগ, জেলা এবং থানা/উপজেলার তালিকা
@@ -432,4 +432,4 @@ function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile,
 
       setUserProfile(profileData);
       setCurrentPage('dashboard');
-      export default App;
+   export default App;
