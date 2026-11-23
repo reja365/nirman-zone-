@@ -282,9 +282,7 @@ function App() {
       )}
     </div>
   );
-}
-
-function AuthPage({ db, userId, fetchProfileByMobile, setUserProfile, setCurrentPage, setMessage, setEnteredMobile }) {
+    }function AuthPage({ db, userId, fetchProfileByMobile, setUserProfile, setCurrentPage, setMessage, setEnteredMobile }) {
   const [mobileNumber, setMobileNumber] = useState('');
   const [checking, setChecking] = useState(false);
 
@@ -347,7 +345,9 @@ function AuthPage({ db, userId, fetchProfileByMobile, setUserProfile, setCurrent
       </button>
     </div>
   );
-    }function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile, setCurrentPage, setMessage }) {
+}
+
+function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile, setCurrentPage, setMessage }) {
   const [userType, setUserType] = useState('');
   const [fullName, setFullName] = useState('');
   const [contactNumber, setContactNumber] = useState(defaultMobile || '');
@@ -640,9 +640,7 @@ function AuthPage({ db, userId, fetchProfileByMobile, setUserProfile, setCurrent
       </button>
     </div>
   );
-}
-
-function DashboardPage({ db, userId, appId, userProfile, setUserProfile, handleLogout, setMessage }) {
+         }function DashboardPage({ db, userId, appId, userProfile, setUserProfile, handleLogout, setMessage }) {
   const [activeTab, setActiveTab] = useState('jobs');
   const [showJobPostModal, setShowJobPostModal] = useState(false);
   const [showPostSaveWalletBar, setShowPostSaveWalletBar] = useState(false);
@@ -835,7 +833,91 @@ function DashboardPage({ db, userId, appId, userProfile, setUserProfile, handleL
 
         <button
           className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
-            activeTab === 'myProfunction AdminPanel({ db, appId, setMessage, onLock }) {
+            activeTab === 'myProfile' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-700'
+          }`}
+          onClick={() => setActiveTab('myProfile')}
+        >
+          {userProfile.type === 'সেবাপ্রার্থী' ? 'আমার প্রোফাইল (ফ্রি)' : 'আমার প্রোফাইল ও পেমেন্ট'}
+        </button>
+
+        {isAdmin && (
+          <button
+            className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
+              activeTab === 'adminPanel' ? 'bg-purple-600 text-white shadow' : 'bg-purple-100 text-purple-800'
+            }`}
+            onClick={() => setActiveTab('adminPanel')}
+          >
+            অ্যাডমিন প্যানেল {adminUnlocked ? '🔓' : '🔒'}
+          </button>
+        )}
+      </div>
+
+      <div className="flex-grow">
+        {activeTab === 'jobs' && (
+          userProfile.type === 'সেবাপ্রদানকারী' ? (
+            <ServiceProviderJobFeed db={db} appId={appId} isServiceProviderActive={isServiceProviderActive} setActiveTab={setActiveTab} setMessage={setMessage} />
+          ) : (
+            <ServiceSeekerJobPosts db={db} userProfile={userProfile} appId={appId} setShowJobPostModal={setShowJobPostModal} setMessage={setMessage} />
+          )
+        )}
+
+        {activeTab === 'findProfessionals' && userProfile.type === 'সেবাপ্রার্থী' && (
+          <FindProfessionals db={db} appId={appId} setMessage={setMessage} />
+        )}
+
+        {activeTab === 'myProfile' && (
+          <MyProfile
+            db={db}
+            userId={userId}
+            appId={appId}
+            userProfile={userProfile}
+            setUserProfile={setUserProfile}
+            isServiceProviderActive={isServiceProviderActive}
+            setMessage={setMessage}
+          />
+        )}
+
+        {activeTab === 'adminPanel' && isAdmin && (
+          !adminUnlocked ? (
+            <div className="max-w-sm mx-auto bg-purple-50 border border-purple-200 p-6 rounded-2xl text-center space-y-4 my-4">
+              <div className="text-3xl">🔒</div>
+              <h3 className="text-lg font-bold text-purple-900">অ্যাডমিন প্যানেল সুরক্ষিত</h3>
+              <p className="text-xs text-gray-600">পেমেন্ট যাচাই ও অনুমোদন করতে আপনার গোপন পিন দিন:</p>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength="6"
+                placeholder="গোপন পিন লিখুন"
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value)}
+                className="w-full border rounded-xl py-2.5 px-4 text-center text-lg tracking-widest font-bold bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                onClick={handleVerifyAdminPin}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition"
+              >
+                অ্যাডমিন প্যানেল খুলুন
+              </button>
+            </div>
+          ) : (
+            <AdminPanel db={db} appId={appId} setMessage={setMessage} onLock={() => setAdminUnlocked(false)} />
+          )
+        )}
+      </div>
+
+      {showJobPostModal && (
+        <JobPostModal
+          db={db}
+          userId={userId}
+          userProfile={userProfile}
+          appId={appId}
+          setShowJobPostModal={setShowJobPostModal}
+          setMessage={setMessage}
+        />
+      )}
+    </div>
+  );
+          }function AdminPanel({ db, appId, setMessage, onLock }) {
   const [paymentRequests, setPaymentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -1035,9 +1117,7 @@ function ServiceSeekerJobPosts({ db, userProfile, appId, setShowJobPostModal, se
       )}
     </div>
   );
-}
-
-function ServiceProviderJobFeed({ db, appId, isServiceProviderActive, setActiveTab }) {
+      }function ServiceProviderJobFeed({ db, appId, isServiceProviderActive, setActiveTab }) {
   const [jobPosts, setJobPosts] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [filterProfession, setFilterProfession] = useState('');
@@ -1135,7 +1215,9 @@ function ServiceProviderJobFeed({ db, appId, isServiceProviderActive, setActiveT
       )}
     </div>
   );
-        }function FindProfessionals({ db, appId }) {
+}
+
+function FindProfessionals({ db, appId }) {
   const [professionals, setProfessionals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterProfession, setFilterProfession] = useState('');
@@ -1218,9 +1300,7 @@ function ServiceProviderJobFeed({ db, appId, isServiceProviderActive, setActiveT
       )}
     </div>
   );
-}
-
-function MyProfile({ db, userId, appId, userProfile, setUserProfile, isServiceProviderActive, setMessage }) {
+      }function MyProfile({ db, userId, appId, userProfile, setUserProfile, isServiceProviderActive, setMessage }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('bkash');
   const [senderNumber, setSenderNumber] = useState('');
@@ -1575,11 +1655,6 @@ function MyProfile({ db, userId, appId, userProfile, setUserProfile, isServicePr
               <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">
                 bKash / Nagad Send Money
               </span>
-              <h3 className="text-xl font-bold text-gray-8// ... existing code ...
-            <div className="text-center mb-4">
-              <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">
-                bKash / Nagad Send Money
-              </span>
               <h3 className="text-xl font-bold text-gray-800 mt-2">৩ মাসের সাবস্ক্রিপশন ফি: ৫০ টাকা</h3>
             </div>
 
@@ -1656,178 +1731,4 @@ function MyProfile({ db, userId, appId, userProfile, setUserProfile, isServicePr
                   type="text"
                   placeholder="যেমন: 9H7G6F5D4S"
                   value={trxId}
-                  onChange={(e) => setTrxId(e.target.value)}
-                  className="border rounded-xl w-full py-2.5 px-3 text-gray-700 uppercase focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="w-1/2 bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2.5 rounded-xl"
-                disabled={submitting}
-              >
-                বাতিল
-              </button>
-              <button
-                onClick={handleSubmitPaymentInfo}
-                className={`w-1/2 text-white font-bold py-2.5 rounded-xl ${
-                  paymentMethod === 'nagad' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-pink-600 hover:bg-pink-700'
-                }`}
-                disabled={submitting}
-              >
-                {submitting ? 'জমা হচ্ছে...' : 'জমা দিন'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// নতুন কাজের পোস্ট মডাল
-function JobPostModal({ db, userId, userProfile, appId, setShowJobPostModal, setMessage }) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [requiredProfession, setRequiredProfession] = useState('');
-  const [division, setDivision] = useState('');
-  const [district, setDistrict] = useState('');
-  const [upazilaThana, setUpazilaThana] = useState('');
-  const [specificAreaName, setSpecificAreaName] = useState('');
-  const [contactNumber, setContactNumber] = useState(userProfile?.contactNumber || '');
-  const [loadingPost, setLoadingPost] = useState(false);
-
-  const divisionsList = Object.keys(bangladeshLocations);
-  const districtsList = division ? Object.keys(bangladeshLocations[division]) : [];
-  const upazilaThanasList = district ? bangladeshLocations[division][district] : [];
-
-  const handleSubmit = async () => {
-    if (!title || !description || !requiredProfession || !division || !district || !upazilaThana || !specificAreaName || !contactNumber) {
-      setMessage("অনুগ্রহ করে সকল ফিল্ড পূরণ করুন।");
-      return;
-    }
-    setLoadingPost(true);
-    try {
-      await addDoc(collection(db, `artifacts/${appId}/public/data/job_posts`), {
-        title,
-        description,
-        requiredProfession,
-        division,
-        district,
-        upazilaThana,
-        specificAreaName,
-        contactNumber,
-        postedByUserId: userId,
-        postedByMobile: userProfile?.contactNumber || contactNumber,
-        postedAt: new Date().toISOString(),
-      });
-      setMessage("কাজের পোস্ট সফলভাবে করা হয়েছে!");
-      setShowJobPostModal(false);
-    } catch (error) {
-      setMessage(`কাজের পোস্ট করতে ব্যর্থ: ${error.message}`);
-    } finally {
-      setLoadingPost(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border border-gray-200 my-auto">
-        <h3 className="text-xl font-bold text-center text-gray-800 mb-4">নতুন কাজের পোস্ট করুন</h3>
-
-        <div className="space-y-3 mb-5">
-          <input
-            type="text"
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="কাজের শিরোনাম (যেমন: ছাদ ঢালাইয়ের মিস্ত্রি চাই)"
-          />
-          <select
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={requiredProfession}
-            onChange={(e) => setRequiredProfession(e.target.value)}
-          >
-            <option value="">প্রয়োজনীয় পেশা নির্বাচন করুন</option>
-            {PROFESSION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              className="border rounded-xl w-full py-2.5 px-3 text-sm"
-              value={division}
-              onChange={(e) => { setDivision(e.target.value); setDistrict(''); }}
-            >
-              <option value="">বিভাগ</option>
-              {divisionsList.map((div) => <option key={div} value={div}>{div}</option>)}
-            </select>
-            <select
-              className="border rounded-xl w-full py-2.5 px-3 text-sm"
-              value={district}
-              onChange={(e) => { setDistrict(e.target.value); setUpazilaThana(''); }}
-              disabled={!division}
-            >
-              <option value="">জেলা</option>
-              {districtsList.map((dist) => <option key={dist} value={dist}>{dist}</option>)}
-            </select>
-          </div>
-
-          <select
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={upazilaThana}
-            onChange={(e) => setUpazilaThana(e.target.value)}
-            disabled={!district}
-          >
-            <option value="">উপজেলা/থানা</option>
-            {upazilaThanasList.map((ut) => <option key={ut} value={ut}>{ut}</option>)}
-          </select>
-
-          <input
-            type="text"
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={specificAreaName}
-            onChange={(e) => setSpecificAreaName(e.target.value)}
-            placeholder="গ্রাম/মহল্লার নাম"
-          />
-
-          <textarea
-            rows="3"
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="কাজের বিস্তারিত বিবরণ..."
-          ></textarea>
-
-          <input
-            type="tel"
-            className="border rounded-xl w-full py-2.5 px-3 text-sm"
-            value={contactNumber}
-            onChange={(e) => setContactNumber(e.target.value)}
-            placeholder="আপনার মোবাইল নম্বর (01XXXXXXXXX)"
-            maxLength="11"
-          />
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => setShowJobPostModal(false)}
-            className="bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-xl text-sm"
-          >
-            বাতিল
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="bg-blue-600 text-white font-bold py-2 px-4 rounded-xl text-sm"
-            disabled={loadingPost}
-          >
-            {loadingPost ? 'পোস্ট হচ্ছে...' : 'পোস্ট করুন'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default App;
+                  onChange={(e) => 
