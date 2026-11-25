@@ -31,7 +31,6 @@ const firebaseConfig = {
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
   appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:000000000000",
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
