@@ -24,12 +24,12 @@ import {
 // ১. FIREBASE CONFIGURATION (আপনার প্রজেক্টের আসল তথ্য বসান)
 // ==========================================
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "YOUR_FIREBASE_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "YOUR_PROJECT.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "YOUR_PROJECT.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:000000000000",
+  apiKey: "AIzaSyB02LNJfuOva_WN3QMF9EZbSx01W0fx8z8",
+  authDomain: "nirman-zone.firebaseapp.com",
+  projectId: "nirman-zone",
+  storageBucket: "nirman-zone.firebasestorage.app",
+  messagingSenderId: "964321389020",
+  appId: "1:964321389020:web:b0c286a4cb41bda16bc719",
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
