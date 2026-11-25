@@ -1,1734 +1,2922 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, onSnapshot, addDoc } from 'firebase/firestore';
+import React, { useState, useEffect, useMemo } from "react";
+import { initializeApp } from "firebase/app";
+import {
+  getAuth,
+  signInAnonymously,
+  onAuthStateChanged,
+} from "firebase/auth";
+import {
+  getFirestore,
+  collection,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  query,
+  where,
+  getDocs,
+  serverTimestamp,
+} from "firebase/firestore";
 
-const ADMIN_BKASH_NUMBER = "01944121530";
-const ADMIN_NAGAD_NUMBER = "01944121530";
-const ADMIN_LOGIN_NUMBER = "01944121530";
-const ADMIN_SECRET_PIN = "4829";
-const SAVED_MOBILE_KEY = "nirman_zone_logged_in_mobile";
+// ==========================================
+// ১. FIREBASE CONFIGURATION (আপনার প্রজেক্টের আসল তথ্য বসান)
+// ==========================================
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "YOUR_FIREBASE_API_KEY",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "YOUR_PROJECT.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "YOUR_PROJECT_ID",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "YOUR_PROJECT.appspot.com",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "000000000000",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:000000000000:web:000000000000",
+};
 
-const bangladeshLocations = {
-  "ঢাকা": {
-    "ঢাকা": ["ধানমন্ডি থানা", "মিরপুর থানা", "মোহাম্মদপুর থানা", "মতিঝিল থানা", "তেজগাঁও থানা", "অন্যান্য থানা"],
-    "গাজীপুর": ["গাজীপুর সদর উপজেলা", "কালিয়াকৈর উপজেলা", "শ্রীপুর উপজেলা", "কাপাসিয়া উপজেলা", "কালীগঞ্জ উপজেলা", "অন্যান্য উপজেলা"],
-    "নারায়ণগঞ্জ": ["নারায়ণগঞ্জ সদর উপজেলা", "রূপগঞ্জ উপজেলা", "আড়াইহাজার উপজেলা", "সোনারগাঁও উপজেলা", "বন্দর উপজেলা", "অন্যান্য উপজেলা"],
-    "ফরিদপুর": ["ফরিদপুর সদর উপজেলা", "ভাঙা উপজেলা", "মধুখালী উপজেলা", "অন্যান্য উপজেলা"],
-    "গোপালগঞ্জ": ["গোপালগঞ্জ সদর উপজেলা", "টুঙ্গিপাড়া উপজেলা", "মুকসুদপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "কিশোরগঞ্জ": ["কিশোরগঞ্জ সদর উপজেলা", "ভৈরব উপজেলা", "বাজিতপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "মাদারীপুর": ["মাদারীপুর সদর উপজেলা", "শিবচর উপজেলা", "রাজৈর উপজেলা", "অন্যান্য উপজেলা"],
-    "মানিকগঞ্জ": ["মানিকগঞ্জ সদর উপজেলা", "সিংগাইর উপজেলা", "দৌলতপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "মুন্সীগঞ্জ": ["মুন্সীগঞ্জ সদর উপজেলা", "গজারিয়া উপজেলা", "লৌহজং উপজেলা", "অন্যান্য উপজেলা"],
-    "নরসিংদী": ["নরসিংদী সদর উপজেলা", "পলাশ উপজেলা", "শিবপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "রাজবাড়ী": ["রাজবাড়ী সদর উপজেলা", "পাংশা উপজেলা", "কালুখালী উপজেলা", "অন্যান্য উপজেলা"],
-    "শরীয়তপুর": ["শরীয়তপুর সদর উপজেলা", "নড়িয়া উপজেলা", "জাজিরা উপজেলা", "অন্যান্য উপজেলা"],
-    "টাঙ্গাইল": ["টাঙ্গাইল সদর উপজেলা", "ঘাটাইল উপজেলা", "দেলদুয়ার উপজেলা", "অন্যান্য উপজেলা"]
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// ==========================================
+// ২. মৌলিক ধ্রুবক ও তালিকা (PIN কোডে রাখা হয়নি)
+// ==========================================
+const DEFAULT_ADMIN_PHONE = "01920098430";
+const SPECIAL_FREE_PROVIDER_PHONE = "01944121530";
+const SPECIAL_FREE_PROVIDER_PROFESSION = "গ্রিল মিস্ত্রি";
+
+const DEFAULT_SETTINGS = {
+  bkashNumber: "01944121530",
+  nagadNumber: "01944121530",
+  subscriptionFee: 50,
+  subscriptionDays: 90,
+  adminPhone: DEFAULT_ADMIN_PHONE,
+  adminEmailOrContact: "01920098430",
+};
+
+const SERVICE_PROVIDER_PROFESSIONS = [
+  "রাজমিস্ত্রি",
+  "গ্রিল মিস্ত্রি",
+  "ওয়েল্ডার",
+  "ইলেকট্রিশিয়ান",
+  "প্লাম্বার",
+  "রংমিস্ত্রি",
+  "টাইলস মিস্ত্রি",
+  "কাঠমিস্ত্রি",
+  "স্যানিটারি মিস্ত্রি",
+  "শ্রমিক",
+  "ঠিকাদার",
+  "সাব-কন্ট্রাক্টর",
+  "ইঞ্জিনিয়ার",
+  "আর্কিটেক্ট",
+  "ইন্টেরিয়র ডিজাইনার",
+  "থাই গ্লাস মিস্ত্রি",
+  "অ্যালুমিনিয়াম মিস্ত্রি",
+  "অন্যান্য নির্মাণসংশ্লিষ্ট পেশা",
+];
+
+const JOB_CATEGORIES = [
+  "নতুন বাড়ি নির্মাণ",
+  "পুরোনো বাড়ি মেরামত",
+  "বাড়ি সংস্কার",
+  "গ্রিল তৈরি ও মেরামত",
+  "গেট তৈরি",
+  "সিঁড়ি তৈরি",
+  "রং করার কাজ",
+  "টাইলস লাগানো",
+  "বৈদ্যুতিক কাজ",
+  "পানির লাইন ও প্লাম্বিং",
+  "অন্যান্য নির্মাণকাজ",
+];
+
+const MATERIAL_CATEGORIES = [
+  "রড",
+  "সিমেন্ট",
+  "বালু",
+  "ইট",
+  "পাথর",
+  "টাইলস",
+  "থাই গ্লাস",
+  "অ্যালুমিনিয়াম",
+  "GI পাইপ",
+  "GI বক্স",
+  "স্যানিটারি সামগ্রী",
+  "বৈদ্যুতিক সামগ্রী",
+  "অন্যান্য নির্মাণসামগ্রী",
+];
+
+// বাংলাদেশের বিভাগ -> জেলা -> উপজেলা/থানা (প্রয়োজন অনুযায়ী আরও বাড়ানো যাবে)
+const BANGLADESH_LOCATIONS = {
+  ঢাকা: {
+    ঢাকা: ["সাভার", "ধামরাই", "কেরানীগঞ্জ", "নবাবগঞ্জ", "দোহার", "মিরপুর", "উত্তরা", "যাত্রাবাড়ী"],
+    গাজীপুর: ["গাজীপুর সদর", "কালিয়াকৈর", "কাপাসিয়া", "শ্রীপুর", "কালীগঞ্জ"],
+    নারায়ণগঞ্জ: ["নারায়ণগঞ্জ সদর", "বন্দর", "রূপগঞ্জ", "সোনারগাঁও", "আড়াইহাজার"],
+    মানিকগঞ্জ: ["মানিকগঞ্জ সদর", "সিংগাইর", "শিবালয়", "ঘিওর", "দৌলতপুর"],
+    মুন্সীগঞ্জ: ["মুন্সীগঞ্জ সদর", "শ্রীনগর", "লৌহজং", "সিরাজদিখান", "টঙ্গীবাড়ী"],
+    নরসিংদী: ["নরসিংদী সদর", "পলাশ", "বেলাবো", "মনোহরদী", "শিবপুর", "রায়পুরা"],
   },
-  "চট্টগ্রাম": {
-    "চট্টগ্রাম": ["কোতোয়ালী থানা", "পাহাড়তলী থানা", "পাঁচলাইশ থানা", "হালিশহর থানা", "পটিয়া উপজেলা", "সীতাকুণ্ড উপজেলা", "অন্যান্য থানা/উপজেলা"],
-    "কুমিল্লা": ["কুমিল্লা সদর দক্ষিণ উপজেলা", "চৌদ্দগ্রাম উপজেলা", "দাউদকান্দি উপজেলা", "বরুড়া উপজেলা", "বুড়িচং উপজেলা", "অন্যান্য উপজেলা"],
-    "ফেনী": ["ফেনী সদর উপজেলা", "পরশুরাম উপজেলা", "ছাগলনাইয়া উপজেলা", "দাগনভূঞা উপজেলা", "ফুলগাজী উপজেলা", "অন্যান্য উপজেলা"],
-    "কক্সবাজার": ["কক্সবাজার সদর উপজেলা", "উখিয়া উপজেলা", "টেকনাফ উপজেলা", "অন্যান্য উপজেলা"],
-    "ব্রাহ্মণবাড়িয়া": ["ব্রাহ্মণবাড়িয়া সদর উপজেলা", "আখাউড়া উপজেলা", "কসবা উপজেলা", "অন্যান্য উপজেলা"],
-    "চাঁদপুর": ["চাঁদপুর সদর উপজেলা", "মতলব উত্তর উপজেলা", "হাজীগঞ্জ উপজেলা", "অন্যান্য উপজেলা"],
-    "নোয়াখালী": ["নোয়াখালী সদর উপজেলা", "হাতিয়া উপজেলা", "সেনবাগ উপজেলা", "অন্যান্য উপজেলা"],
-    "রাঙ্গামাটি": ["রাঙ্গামাটি সদর উপজেলা", "কাপ্তাই উপজেলা", "কাউখালী উপজেলা", "অন্যান্য উপজেলা"],
-    "বান্দরবান": ["বান্দরবান সদর উপজেলা", "রুমা উপজেলা", "থানচি উপজেলা", "অন্যান্য উপজেলা"],
-    "খাগড়াছড়ি": ["খাগড়াছড়ি সদর উপজেলা", "দীঘিনালা উপজেলা", "মাটিরাঙ্গা উপজেলা", "অন্যান্য উপজেলা"]
+  চট্টগ্রাম: {
+    চট্টগ্রাম: ["সীতাকুণ্ড", "মিরসরাই", "হাটহাজারী", "রাউজান", "রাঙ্গুনিয়া", "পটিয়া", "লোহাগাড়া", "সাতকানিয়া"],
+    কক্সবাজার: ["কক্সবাজার সদর", "রামু", "উখিয়া", "টেকনাফ", "চকরিয়া", "পেকুয়া"],
+    কুমিল্লা: ["কুমিল্লা সদর", "লাকসাম", "চৌদ্দগ্রাম", "দাউদকান্দি", "বরুড়া", "মুরাদনগর"],
+    ফেনী: ["ফেনী সদর", "ছাগলনাইয়া", "দাগনভূঞা", "সোনাগাজী", "পরশুরাম"],
   },
-  "খুলনা": {
-    "খুলনা": ["খুলনা সদর থানা", "বটিয়াঘাটা উপজেলা", "রূপসা উপজেলা", "দিঘলিয়া উপজেলা", "দাকোপ উপজেলা", "অন্যান্য থানা/উপজেলা"],
-    "যশোর": ["যশোর সদর উপজেলা", "অভয়নগর উপজেলা", "ঝিকরগাছা উপজেলা", "মনিরামপুর উপজেলা", "কেশবপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "বাগেরহাট": ["বাগেরহাট সদর উপজেলা", "মোংলা উপজেলা", "চিতলমারী উপজেলা", "ফকিরহাট উপজেলা", "রামপাল উপজেলা", "অন্যান্য উপজেলা"],
-    "সাতক্ষীরা": ["সাতক্ষীরা সদর উপজেলা", "কলারোয়া উপজেলা", "দেবহাটা উপজেলা", "অন্যান্য উপজেলা"],
-    "কুষ্টিয়া": ["কুষ্টিয়া সদর উপজেলা", "ভেড়ামারা উপজেলা", "কুমারখালী উপজেলা", "অন্যান্য উপজেলা"],
-    "ঝিনাইদহ": ["ঝিনাইদহ সদর উপজেলা", "শৈলকুপা উপজেলা", "কালীগঞ্জ উপজেলা", "অন্যান্য উপজেলা"],
-    "মাগুরা": ["মাগুরা সদর উপজেলা", "শ্রীপুর উপজেলা", "শালিখা উপজেলা", "অন্যান্য উপজেলা"],
-    "নড়াইল": ["নড়াইল সদর উপজেলা", "লোহাগড়া উপজেলা", "কালিয়া উপজেলা", "অন্যান্য উপজেলা"],
-    "চুয়াডাঙ্গা": ["চুয়াডাঙ্গা সদর উপজেলা", "আলমডাঙ্গা উপজেলা", "দামুড়হুদা উপজেলা", "অন্যান্য উপজেলা"],
-    "মেহেরপুর": ["মেহেরপুর সদর উপজেলা", "মুজিবনগর উপজেলা", "গাংনী উপজেলা", "অন্যান্য উপজেলা"]
+  খুলনা: {
+    খুলনা: ["খুলনা সদর", "রূপসা", "তেরখাদা", "দিঘলিয়া", "ফুলতলা", "ডুমুরিয়া", "বটিয়াঘাটা", "পাইকগাছা"],
+    যশোর: ["যশোর সদর", "ঝিকরগাছা", "শার্শা", "মনিরামপুর", "অভয়নগর", "বাঘারপাড়া", "চৌগাছা"],
+    সাতক্ষীরা: ["সাতক্ষীরা সদর", "কালীগঞ্জ", "শ্যামনগর", "আশাশুনি", "তালা", "কলারোয়া"],
+    কুষ্টিয়া: ["কুষ্টিয়া সদর", "ভেড়ামারা", "মিরপুর", "দৌলতপুর", "খোকসা", "কুমারখালী"],
   },
-  "রাজশাহী": {
-    "রাজশাহী": ["রাজশাহী সদর থানা", "বাঘা উপজেলা", "চারঘাট উপজেলা", "অন্যান্য থানা/উপজেলা"],
-    "বগুড়া": ["বগুড়া সদর উপজেলা", "শেরপুর উপজেলা", "ধুনট উপজেলা", "অন্যান্য উপজেলা"],
-    "জয়পুরহাট": ["জয়পুরহাট সদর উপজেলা", "পাঁচবিবি উপজেলা", "কালাই উপজেলা", "অন্যান্য উপজেলা"],
-    "নওগাঁ": ["নওগাঁ সদর উপজেলা", "আত্রাই উপজেলা", "মান্দা উপজেলা", "অন্যান্য উপজেলা"],
-    "নাটোর": ["নাটোর সদর উপজেলা", "লালপুর উপজেলা", "বড়াইগ্রাম উপজেলা", "অন্যান্য উপজেলা"],
-    "চাঁপাইনবাবগঞ্জ": ["চাঁপাইনবাবগঞ্জ সদর উপজেলা", "শিবগঞ্জ উপজেলা", "গোমস্তাপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "পাবনা": ["পাবনা সদর উপজেলা", "ঈশ্বরদী উপজেলা", "সুজানগর উপজেলা", "অন্যান্য উপজেলা"],
-    "সিরাজগঞ্জ": ["সিরাজগঞ্জ সদর উপজেলা", "শাহজাদপুর উপজেলা", "উল্লাপাড়া উপজেলা", "অন্যান্য উপজেলা"]
+  রাজশাহী: {
+    রাজশাহী: ["পবা", "গোদাগাড়ী", "তানোর", "মোহনপুর", "বাগমারা", "দুর্গাপুর", "পুঠিয়া", "চারঘাট"],
+    বগুড়া: ["বগুড়া সদর", "শাজাহানপুর", "শেরপুর", "কাহালু", "নন্দীগ্রাম", "দুপচাঁচিয়া"],
+    পাবনা: ["পাবনা সদর", "ঈশ্বরদী", "সাঁথিয়া", "সুজানগর", "বেড়া", "চাটমোহর", "ফরিদপুর"],
   },
-  "সিলেট": {
-    "সিলেট": ["সিলেট সদর উপজেলা", "গোলাপগঞ্জ উপজেলা", "ফেঞ্চুগঞ্জ উপজেলা", "অন্যান্য উপজেলা"],
-    "মৌলভীবাজার": ["মৌলভীবাজার সদর উপজেলা", "কমলগঞ্জ উপজেলা", "কুলাউড়া উপজেলা", "অন্যান্য উপজেলা"],
-    "সুনামগঞ্জ": ["সুনামগঞ্জ সদর উপজেলা", "ছাতক উপজেলা", "দিরাই উপজেলা", "অন্যান্য উপজেলা"],
-    "হবিগঞ্জ": ["হবিগঞ্জ সদর উপজেলা", "নবীগঞ্জ উপজেলা", "বাহুবল উপজেলা", "অন্যান্য উপজেলা"]
+  রংপুর: {
+    রংপুর: ["রংপুর সদর", "মিঠাপুকুর", "পীরগাছা", "কাউনিয়া", "বদরগঞ্জ", "তারাগঞ্জ", "গঙ্গাচড়া"],
+    দিনাজপুর: ["দিনাজপুর সদর", "বিরল", "বোচাগঞ্জ", "কাহারোল", "খানসামা", "পার্বতীপুর", "ফুলবাড়ী"],
   },
-  "রংপুর": {
-    "রংপুর": ["রংপুর সদর উপজেলা", "পীরগঞ্জ উপজেলা", "কাউনিয়া উপজেলা", "অন্যান্য উপজেলা"],
-    "দিনাজপুর": ["দিনাজপুর সদর উপজেলা", "পার্বতীপুর উপজেলা", "খানসামা উপজেলা", "অন্যান্য উপজেলা"],
-    "গাইবান্ধা": ["গাইবান্ধা সদর উপজেলা", "পলাশবাড়ী উপজেলা", "সাদুল্লাপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "কুড়িগ্রাম": ["কুড়িগ্রাম সদর উপজেলা", "উলিপুর উপজেলা", "চিলমারী উপজেলা", "অন্যান্য উপজেলা"],
-    "লালমনিরহাট": ["লালমনিরহাট সদর উপজেলা", "আদিতমারী উপজেলা", "পাটগ্রাম উপজেলা", "অন্যান্য উপজেলা"],
-    "নীলফামারী": ["নীলফামারী সদর উপজেলা", "ডোমার উপজেলা", "সৈয়দপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "পঞ্চগড়": ["পঞ্চগড় সদর উপজেলা", "দেবীগঞ্জ উপজেলা", "বোদা উপজেলা", "অন্যান্য উপজেলা"],
-    "ঠাকুরগাঁও": ["ঠাকুরগাঁও সদর উপজেলা", "পীরগঞ্জ উপজেলা", "রানীশংকৈল উপজেলা", "অন্যান্য উপজেলা"]
+  সিলেট: {
+    সিলেট: ["সিলেট সদর", "দক্ষিণ সুরমা", "ফেঞ্চুগঞ্জ", "গোলাপগঞ্জ", "বিয়ানীবাজার", "জৈন্তাপুর", "কানাইঘাট"],
+    মৌলভীবাজার: ["মৌলভীবাজার সদর", "শ্রীমঙ্গল", "কমলগঞ্জ", "কুলাউড়া", "বড়লেখা", "রাজনগর"],
+    হবিগঞ্জ: ["হবিগঞ্জ সদর", "মাধবপুর", "চুনারুঘাট", "নবীগঞ্জ", "বাহুবল", "লাখাই"],
+    সুনামগঞ্জ: ["সুনামগঞ্জ সদর", "ছাতক", "দোয়ারাবাজার", "জগন্নাথপুর", "বিশ্বম্ভরপুর"],
   },
-  "ময়মনসিংহ": {
-    "ময়মনসিংহ": ["ময়মনসিংহ সদর উপজেলা", "মুক্তাগাছা উপজেলা", "ভালুকা উপজেলা", "অন্যান্য উপজেলা"],
-    "জামালপুর": ["জামালপুর সদর উপজেলা", "দেওয়ানগঞ্জ উপজেলা", "ইসলামপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "নেত্রকোনা": ["নেত্রকোণা সদর উপজেলা", "দুর্গাপুর উপজেলা", "কলমাকান্দা উপজেলা", "অন্যান্য উপজেলা"],
-    "শেরপুর": ["শেরপুর সদর উপজেলা", "নকলা উপজেলা", "শ্রীবরদী উপজেলা", "অন্যান্য উপজেলা"]
+  বরিশাল: {
+    বরিশাল: ["বরিশাল সদর", "বাকেরগঞ্জ", "বাবুগঞ্জ", "উজিরপুর", "বানারীপাড়া", "গৌরনদী", "হিজলা"],
+    ভোলা: ["ভোলা সদর", "দৌলতখান", "বোরহানউদ্দিন", "তজুমদ্দিন", "লালমোহন", "চরফ্যাশন"],
+    পটুয়াখালী: ["পটুয়াখালী সদর", "বাউফল", "দশমিনা", "গলাচিপা", "কলাপাড়া", "মির্জাগঞ্জ"],
   },
-  "বরিশাল": {
-    "বরিশাল": ["বরিশাল সদর উপজেলা", "বাবুগঞ্জ উপজেলা", "উজিরপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "ভোলা": ["ভোলা সদর উপজেলা", "চরফ্যাশন উপজেলা", "দৌলতখান উপজেলা", "অন্যান্য উপজেলা"],
-    "ঝালকাঠি": ["ঝালকাঠি সদর উপজেলা", "নলছিটি উপজেলা", "রাজাপুর উপজেলা", "অন্যান্য উপজেলা"],
-    "পটুয়াখালী": ["পটুয়াখালী সদর উপজেলা", "বাউফল উপজেলা", "গলাচিপা উপজেলা", "অন্যান্য উপজেলা"],
-    "পিরোজপুর": ["পিরোজপুর সদর উপজেলা", "ভান্ডারিয়া উপজেলা", "নেছারাবাদ উপজেলা", "অন্যান্য উপজেলা"],
-    "বরগুনা": ["বরগুনা সদর উপজেলা", "পাথরঘাটা উপজেলা", "আমতলী উপজেলা", "অন্যান্য উপজেলা"]
+  ময়মনসিংহ: {
+    ময়মনসিংহ: ["ময়মনসিংহ সদর", "মুক্তাগাছা", "ফুলবাড়িয়া", "ত্রিশাল", "ভালুকা", "গফরগাঁও", "হালুয়াঘাট", "ধোবাউড়া"],
+    জামালপুর: ["জামালপুর সদর", "সরিষাবাড়ী", "মেলান্দহ", "ইসলামপুর", "দেওয়ানগঞ্জ", "মাদারগঞ্জ"],
+    নেত্রকোণা: ["নেত্রকোণা সদর", "কেন্দুয়া", "পূর্বধলা", "দুর্গাপুর", "কলমাকান্দা", "আটপাড়া"],
+  },
+};
+
+// ==========================================
+// ৩. সহায়ক ফাংশন (হেল্পার)
+// ==========================================
+const cleanPhone = (phone = "") => phone.replace(/\D/g, "").slice(0, 11);
+
+const isValidBDPhone = (phone = "") => /^01[3-9]\d{8}$/.test(cleanPhone(phone));
+
+const isSpecialFreeProvider = (phone, profession) =>
+  cleanPhone(phone) === SPECIAL_FREE_PROVIDER_PHONE &&
+  profession === SPECIAL_FREE_PROVIDER_PROFESSION;
+
+const getMembershipStatus = (profile, settings = DEFAULT_SETTINGS) => {
+  if (!profile) {
+    return { isActive: false, daysLeft: 0, statusText: "অ্যাকাউন্ট নেই", isExpiringSoon: false, isExpiredToday: false };
+  }
+  if (profile.isBlocked) {
+    return { isActive: false, daysLeft: 0, statusText: "ব্লক করা হয়েছে", isExpiringSoon: false, isExpiredToday: false };
+  }
+  if (profile.accountType === "owner") {
+    return { isActive: true, daysLeft: 9999, statusText: "স্থায়ী ফ্রি অ্যাকাউন্ট", isExpiringSoon: false, isExpiredToday: false };
+  }
+  if (isSpecialFreeProvider(profile.phone, profile.profession)) {
+    return { isActive: true, daysLeft: 9999, statusText: "বিশেষ স্থায়ী ফ্রি সদস্যপদ", isExpiringSoon: false, isExpiredToday: false };
+  }
+  if (!profile.subscriptionExpiry) {
+    return { isActive: false, daysLeft: 0, statusText: "মেয়াদ সক্রিয় নয়", isExpiringSoon: false, isExpiredToday: false };
+  }
+
+  const now = new Date();
+  const expiry = new Date(profile.subscriptionExpiry);
+  const diffMs = expiry.getTime() - now.getTime();
+  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const endOfToday = startOfToday + 24 * 60 * 60 * 1000 - 1;
+  const expiryMs = expiry.getTime();
+
+  const isExpiredToday = expiryMs >= startOfToday && expiryMs <= endOfToday;
+  const isExpiringSoon = daysLeft > 0 && daysLeft <= 7;
+
+  if (expiryMs > now.getTime()) {
+    return {
+      isActive: true,
+      daysLeft,
+      statusText: `সক্রিয় (বাকি ${daysLeft} দিন)`,
+      isExpiringSoon,
+      isExpiredToday,
+    };
+  }
+
+  return {
+    isActive: false,
+    daysLeft: 0,
+    statusText: "মেয়াদ শেষ হয়েছে",
+    isExpiringSoon: false,
+    isExpiredToday,
+  };
+};
+
+// নিরাপদভাবে ছোট ছবি (DataURL) কম্প্রেস করার হেল্পার (Storage/ব্লব ছাড়াও ফোনে সহজে কাজ করে)
+const readFileAsDataUrl = (file, maxWidth = 800) =>
+  new Promise((resolve, reject) => {
+    if (!file) return resolve("");
+    if (!file.type.startsWith("image/")) {
+      return reject(new Error("শুধুমাত্র ছবি ফাইল নির্বাচন করুন।"));
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      return reject(new Error("ছবির সাইজ ৪ MB-এর কম হতে হবে।"));
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const scale = img.width > maxWidth ? maxWidth / img.width : 1;
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.72));
+      };
+      img.onerror = () => resolve(reader.result);
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+const writeAuditLog = async (actorPhone, action, details = "") => {
+  try {
+    const logRef = doc(collection(db, "nirmanzone_audit_logs"));
+    await setDoc(logRef, {
+      actorPhone: cleanPhone(actorPhone) || "system",
+      action,
+      details,
+      createdAt: new Date().toISOString(),
+      timestamp: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("Audit log error:", err.message);
   }
 };
 
-const PROFESSION_OPTIONS = [
-  'রাজমিস্ত্রি', 'সেন্টারিং মিস্ত্রি', 'ইলেকট্রিক মিস্ত্রি', 'স্যানিটারি মিস্ত্রি', 'কাঠমিস্ত্রি',
-  'গ্রিল মিস্ত্রি', 'থাই গ্লাস মিস্ত্রি', 'ডিপ টিউবল মিস্ত্রি', 'রংমিস্ত্রি', 'অন্যান্য মিস্ত্রি',
-  'হেলপার', 'সিভিল ইঞ্জিনিয়ার', 'আর্কিটেক্ট',
-  'কন্ট্রাক্টর', 'সাব-কন্ট্রাক্টর', 'নির্মাণ সামগ্রী বিক্রেতা'
-];
+// ==========================================
+// ৪. মূল অ্যাপ্লিকেশন
+// ==========================================
+export default function App() {
+  const [authUser, setAuthUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-const SHOP_CATEGORY_OPTIONS = [
-  'সিমেন্ট বিক্রেতা', 'রড বিক্রেতা', 'বালু ও পাথর বিক্রেতা', 'ইট বিক্রেতা',
-  'হার্ডওয়্যার ও ইলেকট্রিক সামগ্রী', 'পেইন্ট ও কেমিক্যাল', 'টাইলস ও স্যানিটারি',
-  'কাঠ ও ফার্নিচার সামগ্রী', 'অন্যান্য নির্মাণ সামগ্রী'
-];
+  const [users, setUsers] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [shops, setShops] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
-function App() {
-  const [db, setDb] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
-  const [currentPage, setCurrentPage] = useState('auth');
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState('');
-  const [enteredMobile, setEnteredMobile] = useState('');
+  const [currentUserPhone, setCurrentUserPhone] = useState(() => {
+    try {
+      return cleanPhone(localStorage.getItem("nirmanzone_active_phone") || "");
+    } catch {
+      return "";
+    }
+  });
 
-  const defaultFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-    apiKey: "AIzaSyB02LNjfuOva_WN3QMF9EZbSx01W8fxBz8",
-    authDomain: "nirman-zone.firebaseapp.com",
-    projectId: "nirman-zone",
-    storageBucket: "nirman-zone.firebasestorage.app",
-    messagingSenderId: "964321389020",
-    appId: "1:964321389020:web:f12bb2884561e91b6bc719"
+  const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [activeTab, setActiveTab] = useState("home"); // home | jobs | providers | shops | profile | admin
+  const [toast, setToast] = useState(null);
+
+  // রেজিস্ট্রেশন / লগইন ফর্ম স্টেট
+  const [authMode, setAuthMode] = useState("login"); // login | register
+  const [loginPhone, setLoginPhone] = useState("");
+  const [regAccountType, setRegAccountType] = useState("owner"); // owner | provider
+  const [regName, setRegName] = useState("");
+  const [regPhone, setRegPhone] = useState("");
+  const [regProfession, setRegProfession] = useState(SERVICE_PROVIDER_PROFESSIONS[0]);
+  const [regExperience, setRegExperience] = useState("");
+  const [regBio, setRegBio] = useState("");
+  const [regDivision, setRegDivision] = useState("");
+  const [regDistrict, setRegDistrict] = useState("");
+  const [regUpazila, setRegUpazila] = useState("");
+  const [regAreaType, setRegAreaType] = useState("গ্রাম/ইউনিয়ন"); // গ্রাম/ইউনিয়ন | শহর/ওয়ার্ড
+  const [regUnionOrWard, setRegUnionOrWard] = useState("");
+  const [regVillageOrMoholla, setRegVillageOrMoholla] = useState("");
+  const [regProfilePhoto, setRegProfilePhoto] = useState("");
+  const [regSamplePhoto, setRegSamplePhoto] = useState("");
+  const [regShopName, setRegShopName] = useState("");
+  const [regShopCategories, setRegShopCategories] = useState([]);
+  const [regShopDesc, setRegShopDesc] = useState("");
+  const [regShopPhoto, setRegShopPhoto] = useState("");
+  const [regShopPriceHint, setRegShopPriceHint] = useState("");
+  const [submittingAuth, setSubmittingAuth] = useState(false);
+
+  // কাজের বিজ্ঞাপন পোস্ট মডাল স্টেট
+  const [showJobModal, setShowJobModal] = useState(false);
+  const [jobTitle, setJobTitle] = useState("");
+  const [jobCategory, setJobCategory] = useState(JOB_CATEGORIES[0]);
+  const [jobProfessionNeeded, setJobProfessionNeeded] = useState("");
+  const [jobDesc, setJobDesc] = useState("");
+  const [jobDivision, setJobDivision] = useState("");
+  const [jobDistrict, setJobDistrict] = useState("");
+  const [jobUpazila, setJobUpazila] = useState("");
+  const [jobAreaDetail, setJobAreaDetail] = useState("");
+  const [jobBudget, setJobBudget] = useState("");
+  const [jobStartDate, setJobStartDate] = useState("");
+  const [jobContactPhone, setJobContactPhone] = useState("");
+  const [jobPhoto, setJobPhoto] = useState("");
+  const [postingJob, setPostingJob] = useState(false);
+
+  // সার্চ ও ফিল্টার স্টেট
+  const [searchProf, setSearchProf] = useState("");
+  const [searchDiv, setSearchDiv] = useState("");
+  const [searchDist, setSearchDist] = useState("");
+  const [searchUpazila, setSearchUpazila] = useState("");
+  const [searchUnionOrWard, setSearchUnionOrWard] = useState("");
+  const [searchArea, setSearchArea] = useState("");
+  const [shopFilterCat, setShopFilterCat] = useState("");
+  const [shopFilterDistrict, setShopFilterDistrict] = useState("");
+
+  // পেমেন্ট জমা মডাল স্টেট
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [payMethod, setPayMethod] = useState("bkash"); // bkash | nagad
+  const [trxIdInput, setTrxIdInput] = useState("");
+  const [payScreenshot, setPayScreenshot] = useState("");
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+
+  // রিপোর্ট মডাল স্টেট
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportReason, setReportReason] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+
+  // অ্যাডমিন লগইন স্টেট (PIN কোডে হার্ডকোড করা হয়নি)
+  const [adminPhoneInput, setAdminPhoneInput] = useState(DEFAULT_ADMIN_PHONE);
+  const [adminPinInput, setAdminPinInput] = useState("");
+  const [adminOtpInput, setAdminOtpInput] = useState("");
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [failedAdminAttempts, setFailedAdminAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
+  const [adminSubTab, setAdminSubTab] = useState("overview");
+
+  // অ্যাডমিন সেটিংস স্টেট
+  const [editSettings, setEditSettings] = useState(DEFAULT_SETTINGS);
+
+  const showToast = (text, type = "info") => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 4200);
   };
 
-  const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-  const appId = typeof __app_id !== 'undefined' ? __app_id : 'nirman-zone-prod';
-
+  // Firebase Anonymous Auth সংযোগ
   useEffect(() => {
-    if (message) {
-      const timer = setTimeout(() => setMessage(''), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [message]);
-
-  const fetchProfileByMobile = useCallback(async (firestore, mobile, uid) => {
-    const mobileDocRef = doc(firestore, `artifacts/${appId}/public/data/profiles_by_mobile`, mobile);
-    const mobileDocSnap = await getDoc(mobileDocRef);
-    if (mobileDocSnap.exists()) {
-      return mobileDocSnap.data();
-    }
-
-    if (uid) {
-      const legacyDocRef = doc(firestore, `artifacts/${appId}/users/${uid}/userProfile`, 'profile');
-      const legacyDocSnap = await getDoc(legacyDocRef);
-      if (legacyDocSnap.exists() && legacyDocSnap.data().contactNumber === mobile) {
-        const legacyData = legacyDocSnap.data();
-        await setDoc(mobileDocRef, legacyData);
-        return legacyData;
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setAuthUser(user);
+        setAuthLoading(false);
+      } else {
+        try {
+          await signInAnonymously(auth);
+        } catch (err) {
+          console.error("Auth error:", err);
+          setAuthLoading(false);
+        }
       }
-    }
+    });
+    return () => unsub();
+  }, []);
 
-    return null;
-  }, [appId]);
-
+  // Firestore রিয়েল-টাইম লিসেনারসমূহ
   useEffect(() => {
-    const initializeFirebase = async () => {
-      try {
-        if (!defaultFirebaseConfig || defaultFirebaseConfig.apiKey === "YOUR_API_KEY") {
-          setMessage("সতর্কতা: Firebase কনফিগারেশন যুক্ত করা হয়নি।");
-          setLoading(false);
-          return;
-        }
+    if (!authUser) return;
 
-        const app = initializeApp(defaultFirebaseConfig);
-        const firestore = getFirestore(app);
-        const authService = getAuth(app);
-        setDb(firestore);
+    const unsubUsers = onSnapshot(collection(db, "nirmanzone_users"), (snap) => {
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
 
-        if (initialAuthToken) {
-          await signInWithCustomToken(authService, initialAuthToken);
-        } else {
-          await signInAnonymously(authService);
-        }
+    const unsubJobs = onSnapshot(collection(db, "nirmanzone_jobs"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setJobs(list);
+    });
 
-        onAuthStateChanged(authService, async (user) => {
-          if (user) {
-            const currentUserId = user.uid;
-            setUserId(currentUserId);
+    const unsubShops = onSnapshot(collection(db, "nirmanzone_shops"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setShops(list);
+    });
 
-            const savedMobile = localStorage.getItem(SAVED_MOBILE_KEY);
-            if (savedMobile && savedMobile.length === 11) {
-              const existingProfile = await fetchProfileByMobile(firestore, savedMobile, currentUserId);
-              if (existingProfile) {
-                setUserProfile(existingProfile);
-                setCurrentPage('dashboard');
-                setLoading(false);
-                return;
-              }
-            }
+    const unsubPayments = onSnapshot(collection(db, "nirmanzone_payments"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setPayments(list);
+    });
 
-            const legacyDocRef = doc(firestore, `artifacts/${appId}/users/${currentUserId}/userProfile`, 'profile');
-            const legacyDocSnap = await getDoc(legacyDocRef);
-            if (legacyDocSnap.exists()) {
-              const data = legacyDocSnap.data();
-              if (data.contactNumber) {
-                localStorage.setItem(SAVED_MOBILE_KEY, data.contactNumber);
-                const mobileDocRef = doc(firestore, `artifacts/${appId}/public/data/profiles_by_mobile`, data.contactNumber);
-                await setDoc(mobileDocRef, data, { merge: true });
-              }
-              setUserProfile(data);
-              setCurrentPage('dashboard');
-            } else {
-              setCurrentPage('auth');
-            }
-          } else {
-            setUserId(null);
-            setUserProfile(null);
-            setCurrentPage('auth');
-          }
-          setLoading(false);
-        });
-      } catch (error) {
-        console.error("Firebase initialization failed:", error);
-        setMessage(`Firebase শুরু করতে ব্যর্থ: ${error.message}`);
-        setLoading(false);
+    const unsubReports = onSnapshot(collection(db, "nirmanzone_reports"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setReports(list);
+    });
+
+    const unsubLogs = onSnapshot(collection(db, "nirmanzone_audit_logs"), (snap) => {
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+      setAuditLogs(list.slice(0, 60));
+    });
+
+    const unsubSettings = onSnapshot(doc(db, "nirmanzone_settings", "main"), (docSnap) => {
+      if (docSnap.exists()) {
+        const merged = { ...DEFAULT_SETTINGS, ...docSnap.data() };
+        setSettings(merged);
+        setEditSettings(merged);
       }
+    });
+
+    return () => {
+      unsubUsers();
+      unsubJobs();
+      unsubShops();
+      unsubPayments();
+      unsubReports();
+      unsubLogs();
+      unsubSettings();
     };
+  }, [authUser]);
 
-    initializeFirebase();
-  }, [initialAuthToken, appId, fetchProfileByMobile]);
+  const currentUser = useMemo(
+    () => users.find((u) => cleanPhone(u.phone) === cleanPhone(currentUserPhone)) || null,
+    [users, currentUserPhone]
+  );
+
+  const membership = useMemo(
+    () => getMembershipStatus(currentUser, settings),
+    [currentUser, settings]
+  );
+
+  useEffect(() => {
+    if (currentUser?.phone && !jobContactPhone) {
+      setJobContactPhone(currentUser.phone);
+    }
+  }, [currentUser, jobContactPhone]);
+
+  // ==========================================
+  // ৫. লগইন, রেজিস্ট্রেশন ও প্রোফাইল আপডেট
+  // ==========================================
+  const handleLoginByPhone = async (e) => {
+    e.preventDefault();
+    const cleaned = cleanPhone(loginPhone);
+    if (!isValidBDPhone(cleaned)) {
+      return showToast("সঠিক ১১ সংখ্যার মোবাইল নম্বর লিখুন (যেমন: 017XXXXXXXX)।", "error");
+    }
+
+    const found = users.find((u) => cleanPhone(u.phone) === cleaned);
+    if (!found) {
+      return showToast("এই নম্বরে কোনো অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে রেজিস্ট্রেশন করুন।", "error");
+    }
+    if (found.isBlocked) {
+      return showToast("এই অ্যাকাউন্টটি সাময়িকভাবে ব্লক করা হয়েছে। অ্যাডমিনের সাথে যোগাযোগ করুন।", "error");
+    }
+
+    setCurrentUserPhone(cleaned);
+    localStorage.setItem("nirmanzone_active_phone", cleaned);
+    await writeAuditLog(cleaned, "USER_LOGIN", `${found.fullName} (${found.accountType}) লগইন করেছেন`);
+    showToast(`স্বাগতম, ${found.fullName}!`, "success");
+    setActiveTab("home");
+  };
+
+  const toggleShopCategory = (cat) => {
+    setRegShopCategories((prev) =>
+      prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
+    );
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    const cleaned = cleanPhone(regPhone);
+    if (!regName.trim()) return showToast("আপনার নাম লিখুন।", "error");
+    if (!isValidBDPhone(cleaned)) return showToast("সঠিক ১১ সংখ্যার মোবাইল নম্বর দিন।", "error");
+    if (!regDivision || !regDistrict || !regUpazila) {
+      return showToast("বিভাগ, জেলা এবং উপজেলা/থানা নির্বাচন করুন।", "error");
+    }
+
+    const exists = users.some((u) => cleanPhone(u.phone) === cleaned);
+    if (exists) {
+      return showToast("এই মোবাইল নম্বর দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট খোলা আছে।", "error");
+    }
+
+    setSubmittingAuth(true);
+    try {
+      const isSpecialFree =
+        regAccountType === "provider" &&
+        isSpecialFreeProvider(cleaned, regProfession);
+
+      const initialExpiry =
+        regAccountType === "owner" || isSpecialFree
+          ? new Date(Date.now() + 3650 * 24 * 60 * 60 * 1000).toISOString()
+          : "";
+
+      const userDoc = {
+        phone: cleaned,
+        fullName: regName.trim(),
+        accountType: regAccountType, // 'owner' | 'provider'
+        profession: regAccountType === "provider" ? regProfession : "",
+        experience: regAccountType === "provider" ? regExperience.trim() : "",
+        bio: regAccountType === "provider" ? regBio.trim() : "",
+        lookingForWork: regAccountType === "provider" ? true : false,
+        division: regDivision,
+        district: regDistrict,
+        upazila: regUpazila,
+        areaType: regAreaType,
+        unionOrWard: regUnionOrWard.trim(),
+        villageOrMoholla: regVillageOrMoholla.trim(),
+        profilePhoto: regProfilePhoto || "",
+        samplePhoto: regSamplePhoto || "",
+        isApproved: regAccountType === "owner" || isSpecialFree ? true : false,
+        isPermanentFree: regAccountType === "owner" || isSpecialFree,
+        isBlocked: false,
+        subscriptionExpiry: initialExpiry,
+        createdAt: new Date().toISOString(),
+      };
+
+      await setDoc(doc(db, "nirmanzone_users", cleaned), userDoc);
+
+      // নির্মাণসামগ্রীর দোকান যুক্ত হলে আলাদা কালেকশনে সংরক্ষণ
+      if (regAccountType === "provider" && regShopName.trim()) {
+        const shopRef = doc(collection(db, "nirmanzone_shops"));
+        await setDoc(shopRef, {
+          ownerPhone: cleaned,
+          ownerName: regName.trim(),
+          shopName: regShopName.trim(),
+          categories: regShopCategories.length > 0 ? regShopCategories : ["অন্যান্য নির্মাণসামগ্রী"],
+          description: regShopDesc.trim(),
+          priceHint: regShopPriceHint.trim(),
+          photo: regShopPhoto || "",
+          division: regDivision,
+          district: regDistrict,
+          upazila: regUpazila,
+          areaType: regAreaType,
+          unionOrWard: regUnionOrWard.trim(),
+          villageOrMoholla: regVillageOrMoholla.trim(),
+          createdAt: new Date().toISOString(),
+        });
+      }
+
+      await writeAuditLog(
+        cleaned,
+        "USER_REGISTER",
+        `নতুন ${regAccountType === "owner" ? "মালিক/মহাজন" : "সার্ভিস প্রোভাইডার"} অ্যাকাউন্ট: ${regName.trim()}`
+      );
+
+      setCurrentUserPhone(cleaned);
+      localStorage.setItem("nirmanzone_active_phone", cleaned);
+
+      if (regAccountType === "owner" || isSpecialFree) {
+        showToast(
+          isSpecialFree
+            ? "আপনার বিশেষ স্থায়ী ফ্রি গ্রিল মিস্ত্রি অ্যাকাউন্ট সক্রিয় হয়েছে!"
+            : "আপনার ফ্রি মালিক/মহাজন অ্যাকাউন্ট তৈরি হয়েছে!",
+          "success"
+        );
+      } else {
+        showToast(
+          `রেজিস্ট্রেশন সম্পন্ন! ৫০ টাকা / ৯০ দিনের সদস্যপদ চালুর জন্য পেমেন্ট ও TrxID জমা দিন।`,
+          "info"
+        );
+        setShowPaymentModal(true);
+      }
+
+      setActiveTab("home");
+    } catch (err) {
+      showToast(`রেজিস্ট্রেশন ব্যর্থ: ${err.message}`, "error");
+    } finally {
+      setSubmittingAuth(false);
+    }
+  };
 
   const handleLogout = () => {
-    localStorage.removeItem(SAVED_MOBILE_KEY);
-    setUserProfile(null);
-    setEnteredMobile('');
-    setCurrentPage('auth');
-    setMessage("সফলভাবে লগআউট করা হয়েছে।");
+    setCurrentUserPhone("");
+    setIsAdminAuthenticated(false);
+    localStorage.removeItem("nirmanzone_active_phone");
+    setActiveTab("home");
+    showToast("আপনি লগআউট করেছেন।", "info");
   };
 
-  if (loading) {
+  const handleToggleLookingForWork = async () => {
+    if (!currentUser || currentUser.accountType !== "provider") return;
+    try {
+      const nextVal = !currentUser.lookingForWork;
+      await updateDoc(doc(db, "nirmanzone_users", currentUser.phone), {
+        lookingForWork: nextVal,
+      });
+      showToast(
+        nextVal ? "'আমি কাজ খুঁজছি' ON করা হয়েছে।" : "'আমি কাজ খুঁজছি' OFF করা হয়েছে।",
+        "success"
+      );
+    } catch (err) {
+      showToast(`আপডেট ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  // ==========================================
+  // ৬. কাজের বিজ্ঞাপন (পোস্ট ও সম্পন্ন/বন্ধ)
+  // ==========================================
+  const handleCreateJob = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      return showToast("কাজের বিজ্ঞাপন দিতে আগে লগইন বা রেজিস্ট্রেশন করুন।", "error");
+    }
+    if (currentUser.isBlocked) {
+      return showToast("আপনার অ্যাকাউন্ট ব্লক করা আছে।", "error");
+    }
+    if (!jobTitle.trim() || !jobDesc.trim() || !jobDivision || !jobDistrict || !jobUpazila) {
+      return showToast("শিরোনাম, বিবরণ এবং ঠিকানা (বিভাগ, জেলা, উপজেলা) পূরণ করুন।", "error");
+    }
+    const contact = cleanPhone(jobContactPhone || currentUser.phone);
+    if (!isValidBDPhone(contact)) {
+      return showToast("সঠিক যোগাযোগের মোবাইল নম্বর দিন।", "error");
+    }
+
+    setPostingJob(true);
+    try {
+      const jobRef = doc(collection(db, "nirmanzone_jobs"));
+      await setDoc(jobRef, {
+        title: jobTitle.trim(),
+        category: jobCategory,
+        professionNeeded: jobProfessionNeeded,
+        description: jobDesc.trim(),
+        division: jobDivision,
+        district: jobDistrict,
+        upazila: jobUpazila,
+        areaDetail: jobAreaDetail.trim(),
+        budget: jobBudget.trim(),
+        startDate: jobStartDate || "",
+        contactPhone: contact,
+        ownerPhone: currentUser.phone,
+        ownerName: currentUser.fullName,
+        photo: jobPhoto || "",
+        status: "open", // 'open' | 'closed'
+        createdAt: new Date().toISOString(),
+      });
+
+      await writeAuditLog(currentUser.phone, "JOB_POSTED", `কাজের বিজ্ঞাপন: ${jobTitle.trim()}`);
+      setJobTitle("");
+      setJobDesc("");
+      setJobAreaDetail("");
+      setJobBudget("");
+      setJobStartDate("");
+      setJobPhoto("");
+      setShowJobModal(false);
+      showToast("কাজের বিজ্ঞাপন সফলভাবে প্রকাশ করা হয়েছে!", "success");
+    } catch (err) {
+      showToast(`বিজ্ঞাপন প্রকাশে সমস্যা: ${err.message}`, "error");
+    } finally {
+      setPostingJob(false);
+    }
+  };
+
+  const handleCloseJob = async (jobId) => {
+    try {
+      await updateDoc(doc(db, "nirmanzone_jobs", jobId), {
+        status: "closed",
+        closedAt: new Date().toISOString(),
+      });
+      showToast("কাজ সম্পন্ন হিসেবে বিজ্ঞাপনটি বন্ধ করা হয়েছে।", "success");
+    } catch (err) {
+      showToast(`বন্ধ করতে সমস্যা: ${err.message}`, "error");
+    }
+  };
+
+  // ==========================================
+  // ৭. পেমেন্ট জমা ও অ্যাডমিন অনুমোদন
+  // ==========================================
+  const handleSubmitPayment = async (e) => {
+    e.preventDefault();
+    if (!currentUser) {
+      return showToast("আগে আপনার সার্ভিস প্রোভাইডার অ্যাকাউন্টে লগইন করুন।", "error");
+    }
+    const cleanTrx = trxIdInput.trim().toUpperCase();
+    if (cleanTrx.length < 6) {
+      return showToast("সঠিক Transaction ID (TrxID) লিখুন।", "error");
+    }
+
+    setSubmittingPayment(true);
+    try {
+      // একই TrxID দিয়ে একাধিক অ্যাকাউন্টে সদস্যপদ চালু প্রতিরোধ
+      const dupQuery = query(
+        collection(db, "nirmanzone_payments"),
+        where("trxId", "==", cleanTrx)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      const alreadyUsedByOther = dupSnap.docs.some(
+        (d) => cleanPhone(d.data().userPhone) !== cleanPhone(currentUser.phone)
+      );
+      if (alreadyUsedByOther) {
+        setSubmittingPayment(false);
+        return showToast(
+          "এই Transaction ID ইতিমধ্যে অন্য অ্যাকাউন্টে ব্যবহৃত হয়েছে! ভুয়া বা ডুপ্লিকেট TrxID গ্রহণযোগ্য নয়।",
+          "error"
+        );
+      }
+
+      const targetWallet =
+        payMethod === "nagad" ? settings.nagadNumber : settings.bkashNumber;
+
+      const payRef = doc(collection(db, "nirmanzone_payments"));
+      await setDoc(payRef, {
+        userPhone: currentUser.phone,
+        userName: currentUser.fullName,
+        profession: currentUser.profession || "",
+        method: payMethod,
+        targetWallet,
+        amount: Number(settings.subscriptionFee) || 50,
+        days: Number(settings.subscriptionDays) || 90,
+        trxId: cleanTrx,
+        screenshot: payScreenshot || "",
+        status: "pending", // 'pending' | 'approved' | 'rejected'
+        createdAt: new Date().toISOString(),
+      });
+
+      await writeAuditLog(
+        currentUser.phone,
+        "PAYMENT_SUBMITTED",
+        `TrxID: ${cleanTrx} (${payMethod.toUpperCase()}, ${settings.subscriptionFee} টাকা)`
+      );
+
+      setTrxIdInput("");
+      setPayScreenshot("");
+      setShowPaymentModal(false);
+      showToast("পেমেন্ট তথ্য জমা হয়েছে। অ্যাডমিন যাচাই করে অনুমোদন দিলে সদস্যপদ চালু হবে।", "success");
+    } catch (err) {
+      showToast(`পেমেন্ট জমা দিতে সমস্যা: ${err.message}`, "error");
+    } finally {
+      setSubmittingPayment(false);
+    }
+  };
+
+  const handleApprovePayment = async (paymentItem) => {
+    if (!isAdminAuthenticated) return showToast("শুধুমাত্র অনুমোদিত অ্যাডমিন অনুমোদন করতে পারেন।", "error");
+    try {
+      const daysToAdd = Number(paymentItem.days || settings.subscriptionDays || 90);
+      const userDoc = users.find((u) => cleanPhone(u.phone) === cleanPhone(paymentItem.userPhone));
+      const baseDate =
+        userDoc?.subscriptionExpiry && new Date(userDoc.subscriptionExpiry) > new Date()
+          ? new Date(userDoc.subscriptionExpiry)
+          : new Date();
+      const nextExpiry = new Date(baseDate.getTime() + daysToAdd * 24 * 60 * 60 * 1000).toISOString();
+
+      await updateDoc(doc(db, "nirmanzone_payments", paymentItem.id), {
+        status: "approved",
+        approvedAt: new Date().toISOString(),
+      });
+
+      await updateDoc(doc(db, "nirmanzone_users", cleanPhone(paymentItem.userPhone)), {
+        isApproved: true,
+        subscriptionExpiry: nextExpiry,
+      });
+
+      await writeAuditLog(
+        settings.adminPhone,
+        "PAYMENT_APPROVED",
+        `${paymentItem.userPhone} (TrxID: ${paymentItem.trxId}) — ${daysToAdd} দিনের সদস্যপদ চালু`
+      );
+      showToast(`${paymentItem.userName}-এর সদস্যপদ ${daysToAdd} দিনের জন্য অনুমোদিত হয়েছে!`, "success");
+    } catch (err) {
+      showToast(`অনুমোদন ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  const handleRejectPayment = async (paymentItem) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      await updateDoc(doc(db, "nirmanzone_payments", paymentItem.id), {
+        status: "rejected",
+        rejectedAt: new Date().toISOString(),
+      });
+      await writeAuditLog(
+        settings.adminPhone,
+        "PAYMENT_REJECTED",
+        `${paymentItem.userPhone} (TrxID: ${paymentItem.trxId}) বাতিল করা হয়েছে`
+      );
+      showToast("পেমেন্ট অনুরোধ বাতিল করা হয়েছে।", "info");
+    } catch (err) {
+      showToast(`বাতিল করতে সমস্যা: ${err.message}`, "error");
+    }
+  };
+
+  // ==========================================
+  // ৮. রিপোর্ট ও অ্যাডমিন নিয়ন্ত্রণ
+  // ==========================================
+  const handleSubmitReport = async (e) => {
+    e.preventDefault();
+    if (!reportTarget || !reportReason.trim()) {
+      return showToast("রিপোর্টের কারণ লিখুন।", "error");
+    }
+    setSubmittingReport(true);
+    try {
+      const repRef = doc(collection(db, "nirmanzone_reports"));
+      await setDoc(repRef, {
+        targetType: reportTarget.type,
+        targetId: reportTarget.id,
+        targetName: reportTarget.name,
+        targetPhone: reportTarget.phone || "",
+        reporterPhone: currentUserPhone || "guest",
+        reason: reportReason.trim(),
+        status: "open",
+        createdAt: new Date().toISOString(),
+      });
+      await writeAuditLog(
+        currentUserPhone || "guest",
+        "REPORT_SUBMITTED",
+        `${reportTarget.name} (${reportTarget.type}): ${reportReason.trim()}`
+      );
+      setReportReason("");
+      setReportTarget(null);
+      showToast("আপনার অভিযোগ/রিপোর্ট অ্যাডমিনের কাছে পাঠানো হয়েছে।", "success");
+    } catch (err) {
+      showToast(`রিপোর্ট পাঠাতে সমস্যা: ${err.message}`, "error");
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+  // অ্যাডমিন লগইন (PIN কোডে হার্ডকোড করা নেই — Firestore admin_config থেকে যাচাই হয়)
+  const handleAdminLogin = async (e) => {
+    e.preventDefault();
+    const now = Date.now();
+    if (lockoutUntil > now) {
+      const secLeft = Math.ceil((lockoutUntil - now) / 1000);
+      return showToast(`বারবার ভুল চেষ্টার কারণে লগইন সাময়িক বন্ধ। ${secLeft} সেকেন্ড পর চেষ্টা করুন।`, "error");
+    }
+
+    const phone = cleanPhone(adminPhoneInput);
+    const activeAdminPhone = cleanPhone(settings.adminPhone || DEFAULT_ADMIN_PHONE);
+
+    if (phone !== activeAdminPhone) {
+      const nextFail = failedAdminAttempts + 1;
+      setFailedAdminAttempts(nextFail);
+      if (nextFail >= 4) setLockoutUntil(Date.now() + 60 * 1000);
+      return showToast("অননুমোদিত অ্যাডমিন নম্বর।", "error");
+    }
+
+    if (!adminPinInput.trim()) {
+      return showToast("গোপন PIN লিখুন।", "error");
+    }
+
+    if (generatedOtp && adminOtpInput.trim() !== generatedOtp) {
+      return showToast("যাচাই কোড (OTP) সঠিক নয়।", "error");
+    }
+
+    try {
+      // Firestore-এ সংরক্ষিত admin_config/security ডকুমেন্টে pinHash অথবা pin যাচাই
+      const secSnap = await getDoc(doc(db, "nirmanzone_admin_config", "security"));
+      let validPin = false;
+
+      if (secSnap.exists()) {
+        const data = secSnap.data();
+        const encoder = new TextEncoder();
+        const hashBuf = await crypto.subtle.digest(
+          "SHA-256",
+          encoder.encode(adminPinInput.trim())
+        );
+        const computedHash = Array.from(new Uint8Array(hashBuf))
+          .map((b) => b.toString(16).padStart(2, "0"))
+          .join("");
+
+        if (data.pinSha256 && data.pinSha256 === computedHash) {
+          validPin = true;
+        } else if (data.pin && data.pin === adminPinInput.trim()) {
+          validPin = true;
+        }
+      } else {
+        // প্রথমবার সেটআপের ক্ষেত্রে: Firestore-এ admin_config/security তৈরি করে PIN সেট করার নির্দেশনা
+        return showToast(
+          "Firestore-এ nirmanzone_admin_config/security ডকুমেন্টে pinSha256 সেট করুন (কোডে PIN রাখা হয়নি)।",
+          "error"
+        );
+      }
+
+      if (!validPin) {
+        const nextFail = failedAdminAttempts + 1;
+        setFailedAdminAttempts(nextFail);
+        await writeAuditLog(phone, "ADMIN_LOGIN_FAILED", `ভুল PIN চেষ্টা (#${nextFail})`);
+        if (nextFail >= 4) {
+          setLockoutUntil(Date.now() + 60 * 1000);
+          return showToast("৪ বার ভুল PIN দেওয়ায় ১ মিনিটের জন্য অ্যাডমিন লগইন বন্ধ রাখা হয়েছে।", "error");
+        }
+        return showToast("ভুল অ্যাডমিন PIN!", "error");
+      }
+
+      setIsAdminAuthenticated(true);
+      setFailedAdminAttempts(0);
+      setAdminPinInput("");
+      setAdminOtpInput("");
+      setGeneratedOtp("");
+      await writeAuditLog(phone, "ADMIN_LOGIN_SUCCESS", "অ্যাডমিন প্যানেলে প্রবেশ করেছেন");
+      showToast("নিরাপদ অ্যাডমিন প্যানেলে স্বাগতম!", "success");
+    } catch (err) {
+      showToast(`অ্যাডমিন যাচাই ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  const handleSendAdminOtp = () => {
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    setGeneratedOtp(code);
+    showToast(`নিরাপদ যাচাই কোড (OTP): ${code}`, "info");
+  };
+
+  const handleAdminToggleBlock = async (userItem) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const nextBlock = !userItem.isBlocked;
+      await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+        isBlocked: nextBlock,
+      });
+      await writeAuditLog(
+        settings.adminPhone,
+        nextBlock ? "USER_BLOCKED" : "USER_UNBLOCKED",
+        `${userItem.fullName} (${userItem.phone})`
+      );
+      showToast(nextBlock ? "ব্যবহারকারী ব্লক করা হয়েছে।" : "ব্যবহারকারী আনব্লক করা হয়েছে।", "success");
+    } catch (err) {
+      showToast(`ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  const handleAdminToggleMembership = async (userItem, activateDays = 90) => {
+    if (!isAdminAuthenticated) return;
+    try {
+      const st = getMembershipStatus(userItem, settings);
+      if (st.isActive && !userItem.isPermanentFree) {
+        // সদস্যপদ বন্ধ করা (তথ্য না মুছে মেয়াদ অতীতে সেট করা)
+        await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+          subscriptionExpiry: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        });
+        await writeAuditLog(settings.adminPhone, "MEMBERSHIP_DEACTIVATED", `${userItem.phone}`);
+        showToast("সদস্যপদ সাময়িক বন্ধ করা হয়েছে (প্রোফাইল তথ্য অক্ষত আছে)।", "info");
+      } else {
+        const nextExp = new Date(
+          Date.now() + Number(activateDays || 90) * 24 * 60 * 60 * 1000
+        ).toISOString();
+        await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+          isApproved: true,
+          subscriptionExpiry: nextExp,
+        });
+        await writeAuditLog(
+          settings.adminPhone,
+          "MEMBERSHIP_ACTIVATED",
+          `${userItem.phone} (${activateDays} দিন)`
+        );
+        showToast(`${activateDays} দিনের জন্য সদস্যপদ চালু করা হয়েছে।`, "success");
+      }
+    } catch (err) {
+      showToast(`ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    if (!isAdminAuthenticated) return;
+    try {
+      const payload = {
+        bkashNumber: cleanPhone(editSettings.bkashNumber) || DEFAULT_SETTINGS.bkashNumber,
+        nagadNumber: cleanPhone(editSettings.nagadNumber) || DEFAULT_SETTINGS.nagadNumber,
+        subscriptionFee: Number(editSettings.subscriptionFee) || 50,
+        subscriptionDays: Number(editSettings.subscriptionDays) || 90,
+        adminPhone: cleanPhone(editSettings.adminPhone) || DEFAULT_ADMIN_PHONE,
+        adminEmailOrContact: editSettings.adminEmailOrContact.trim() || DEFAULT_ADMIN_PHONE,
+      };
+      await setDoc(doc(db, "nirmanzone_settings", "main"), payload, { merge: true });
+      await writeAuditLog(payload.adminPhone, "SETTINGS_UPDATED", "পেমেন্ট/ফি/অ্যাডমিন তথ্য আপডেট");
+      showToast("অ্যাডমিন সেটিংস সফলভাবে সংরক্ষিত হয়েছে!", "success");
+    } catch (err) {
+      showToast(`সেটিংস সংরক্ষণ ব্যর্থ: ${err.message}`, "error");
+    }
+  };
+
+  // ==========================================
+  // ৯. ফিল্টার করা তালিকা
+  // ==========================================
+  const filteredProviders = useMemo(() => {
+    return users.filter((u) => {
+      if (u.accountType !== "provider" || u.isBlocked) return false;
+      const st = getMembershipStatus(u, settings);
+      if (!st.isActive) return false; // মেয়াদ শেষ হলে পেইড সুবিধা/তালিকায় সক্রিয় দেখাবে না
+
+      if (searchProf && u.profession !== searchProf) return false;
+      if (searchDiv && u.division !== searchDiv) return false;
+      if (searchDist && u.district !== searchDist) return false;
+      if (searchUpazila && u.upazila !== searchUpazila) return false;
+      if (
+        searchUnionOrWard.trim() &&
+        !(u.unionOrWard || "").toLowerCase().includes(searchUnionOrWard.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      if (
+        searchArea.trim() &&
+        !(u.villageOrMoholla || "").toLowerCase().includes(searchArea.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [users, settings, searchProf, searchDiv, searchDist, searchUpazila, searchUnionOrWard, searchArea]);
+
+  const filteredShops = useMemo(() => {
+    return shops.filter((s) => {
+      if (shopFilterCat && !(s.categories || []).includes(shopFilterCat)) return false;
+      if (
+        shopFilterDistrict.trim() &&
+        !(s.district || "").toLowerCase().includes(shopFilterDistrict.trim().toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [shops, shopFilterCat, shopFilterDistrict]);
+
+  const ownersList = useMemo(() => users.filter((u) => u.accountType === "owner"), [users]);
+  const providersList = useMemo(() => users.filter((u) => u.accountType === "provider"), [users]);
+  const expiredProvidersList = useMemo(
+    () =>
+      providersList.filter(
+        (u) => !u.isPermanentFree && !getMembershipStatus(u, settings).isActive
+      ),
+    [providersList, settings]
+  );
+
+  const totalApprovedIncome = useMemo(
+    () =>
+      payments
+        .filter((p) => p.status === "approved")
+        .reduce((sum, p) => sum + Number(p.amount || settings.subscriptionFee || 50), 0),
+    [payments, settings.subscriptionFee]
+  );
+
+  const searchDistricts = searchDiv ? Object.keys(BANGLADESH_LOCATIONS[searchDiv] || {}) : [];
+  const searchUpazilas =
+    searchDiv && searchDist ? BANGLADESH_LOCATIONS[searchDiv]?.[searchDist] || [] : [];
+
+  const regDistricts = regDivision ? Object.keys(BANGLADESH_LOCATIONS[regDivision] || {}) : [];
+  const regUpazilas =
+    regDivision && regDistrict ? BANGLADESH_LOCATIONS[regDivision]?.[regDistrict] || [] : [];
+
+  const jobDistricts = jobDivision ? Object.keys(BANGLADESH_LOCATIONS[jobDivision] || {}) : [];
+  const jobUpazilas =
+    jobDivision && jobDistrict ? BANGLADESH_LOCATIONS[jobDivision]?.[jobDistrict] || [] : [];
+
+  if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="text-center text-lg font-semibold text-gray-700">
-          নির্মাণ জোন লোড হচ্ছে...
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow p-6 text-center max-w-sm w-full">
+          <p className="text-lg font-bold text-emerald-700">নির্মাণ জোন (NIRMAN ZONE)</p>
+          <p className="text-sm text-slate-600 mt-2">অ্যাপ লোড হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-3 sm:p-4 font-sans">
-      {message && (
-        <div className="fixed top-4 right-4 left-4 sm:left-auto bg-blue-600 text-white p-3 rounded-xl shadow-lg z-50 text-center sm:text-left">
-          {message}
+    <div className="min-h-screen bg-slate-100 text-slate-800 pb-24">
+      {/* টোস্ট নোটিফিকেশন */}
+      {toast && (
+        <div
+          className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-xl shadow-lg text-white text-sm font-semibold max-w-md w-[92%] text-center ${
+            toast.type === "error"
+              ? "bg-rose-600"
+              : toast.type === "success"
+              ? "bg-emerald-600"
+              : "bg-slate-800"
+          }`}
+        >
+          {toast.text}
         </div>
       )}
 
-      {currentPage === 'auth' && (
-        <AuthPage
-          db={db}
-          userId={userId}
-          fetchProfileByMobile={fetchProfileByMobile}
-          setUserProfile={setUserProfile}
-          setCurrentPage={setCurrentPage}
-          setMessage={setMessage}
-          setEnteredMobile={setEnteredMobile}
-        />
-      )}
-
-      {currentPage === 'profileCreation' && db && userId && (
-        <ProfileCreationPage
-          db={db}
-          userId={userId}
-          appId={appId}
-          defaultMobile={enteredMobile}
-          setUserProfile={setUserProfile}
-          setCurrentPage={setCurrentPage}
-          setMessage={setMessage}
-        />
-      )}
-
-      {currentPage === 'dashboard' && db && userId && userProfile && (
-        <DashboardPage
-          db={db}
-          userId={userId}
-          appId={appId}
-          userProfile={userProfile}
-          setUserProfile={setUserProfile}
-          handleLogout={handleLogout}
-          setMessage={setMessage}
-        />
-      )}
-    </div>
-  );
-    }function AuthPage({ db, userId, fetchProfileByMobile, setUserProfile, setCurrentPage, setMessage, setEnteredMobile }) {
-  const [mobileNumber, setMobileNumber] = useState('');
-  const [checking, setChecking] = useState(false);
-
-  const handleAuth = async () => {
-    const cleanMobile = mobileNumber.trim();
-    if (cleanMobile.length === 11 && cleanMobile.startsWith('01')) {
-      setChecking(true);
-      setEnteredMobile(cleanMobile);
-      try {
-        if (db) {
-          const existingProfile = await fetchProfileByMobile(db, cleanMobile, userId);
-          if (existingProfile) {
-            localStorage.setItem(SAVED_MOBILE_KEY, cleanMobile);
-            setUserProfile(existingProfile);
-            setCurrentPage('dashboard');
-            setMessage(`স্বাগতম, ${existingProfile.fullName}! আপনার সেভ করা প্রোফাইল খুলেছে।`);
-            setChecking(false);
-            return;
-          }
-        }
-        setMessage("এই নম্বরে নতুন প্রোফাইল তৈরি করুন।");
-        setCurrentPage('profileCreation');
-      } catch (err) {
-        setCurrentPage('profileCreation');
-      } finally {
-        setChecking(false);
-      }
-    } else {
-      setMessage("অনুগ্রহ করে ১১ ডিজিটের সঠিক মোবাইল নম্বর দিন (যেমন: 017XXXXXXXX)।");
-    }
-  };
-
-  return (
-    <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-200">
-      <div className="text-center mb-6">
-        <span className="bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1 rounded-full">নির্মাণ সেবা প্ল্যাটফর্ম</span>
-        <h2 className="text-3xl font-bold text-gray-800 mt-2">নির্মাণ জোন</h2>
-        <p className="text-gray-600 mt-1 text-sm">মোবাইল নম্বর দিয়ে প্রবেশ করুন</p>
-      </div>
-      <div className="mb-6">
-        <label htmlFor="mobileNumber" className="block text-gray-700 text-sm font-medium mb-2">
-          মোবাইল নম্বর:
-        </label>
-        <input
-          type="tel"
-          id="mobileNumber"
-          className="shadow-sm appearance-none border rounded-xl w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="যেমন: 017XXXXXXXX"
-          value={mobileNumber}
-          onChange={(e) => setMobileNumber(e.target.value)}
-          maxLength="11"
-        />
-      </div>
-      <button
-        onClick={handleAuth}
-        disabled={checking}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
-      >
-        {checking ? 'যাচাই হচ্ছে...' : 'প্রবেশ করুন / নিবন্ধন করুন'}
-      </button>
-    </div>
-  );
-}
-
-function ProfileCreationPage({ db, userId, appId, defaultMobile, setUserProfile, setCurrentPage, setMessage }) {
-  const [userType, setUserType] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [contactNumber, setContactNumber] = useState(defaultMobile || '');
-
-  const [division, setDivision] = useState('');
-  const [district, setDistrict] = useState('');
-  const [upazilaThana, setUpazilaThana] = useState('');
-  const [unionOrWardType, setUnionOrWardType] = useState('');
-  const [unionOrWardName, setUnionOrWardName] = useState('');
-  const [specificAreaName, setSpecificAreaName] = useState('');
-
-  const [profession, setProfession] = useState('');
-  const [experience, setExperience] = useState('');
-  const [shopCategory, setShopCategory] = useState('');
-  const [shopName, setShopName] = useState('');
-  const [projectType, setProjectType] = useState('');
-
-  const [loadingSave, setLoadingSave] = useState(false);
-
-  const handleSaveProfile = async () => {
-    const cleanNumber = contactNumber.trim();
-    if (!fullName || !userType || cleanNumber.length !== 11 || !division || !district || !upazilaThana || !unionOrWardType || !unionOrWardName || !specificAreaName || (userType === 'সেবাপ্রদানকারী' && !profession)) {
-      setMessage("অনুগ্রহ করে সকল প্রয়োজনীয় ফিল্ড এবং ১১ ডিজিটের সঠিক নম্বর পূরণ করুন।");
-      return;
-    }
-    if (userType === 'সেবাপ্রদানকারী' && profession === 'নির্মাণ সামগ্রী বিক্রেতা' && (!shopCategory || !shopName)) {
-      setMessage("দোকানের নাম এবং ক্যাটাগরি পূরণ করা আবশ্যক।");
-      return;
-    }
-
-    setLoadingSave(true);
-    try {
-      const profileData = {
-        userId: userId,
-        fullName: fullName.trim(),
-        type: userType,
-        contactNumber: cleanNumber,
-        division: division,
-        district: district,
-        upazilaThana: upazilaThana,
-        unionOrWardType: unionOrWardType,
-        unionOrWardName: unionOrWardName,
-        specificAreaName: specificAreaName.trim(),
-        createdAt: new Date().toISOString(),
-        lastPaymentDate: null,
-        nextPaymentDueDate: null,
-        paymentStatus: 'unpaid',
-      };
-
-      if (userType === 'সেবাপ্রদানকারী') {
-        profileData.profession = profession;
-        profileData.experience = experience;
-        const now = new Date();
-        profileData.nextPaymentDueDate = now.toISOString();
-
-        if (profession === 'নির্মাণ সামগ্রী বিক্রেতা') {
-          profileData.shopCategory = shopCategory;
-          profileData.shopName = shopName;
-        }
-      } else {
-        profileData.projectType = projectType;
-      }
-
-      const mobileDocRef = doc(db, `artifacts/${appId}/public/data/profiles_by_mobile`, cleanNumber);
-      await setDoc(mobileDocRef, profileData);
-
-      const userDocRef = doc(db, `artifacts/${appId}/users/${userId}/userProfile`, 'profile');
-      await setDoc(userDocRef, profileData);
-
-      localStorage.setItem(SAVED_MOBILE_KEY, cleanNumber);
-
-      setUserProfile(profileData);
-      setCurrentPage('dashboard');
-      setMessage("প্রোফাইল স্থায়ীভাবে সেভ হয়েছে!");
-    } catch (error) {
-      setMessage(`প্রোফাইল সেভ করতে ব্যর্থ: ${error.message}`);
-    } finally {
-      setLoadingSave(false);
-    }
-  };
-
-  const divisions = Object.keys(bangladeshLocations);
-  const districts = division ? Object.keys(bangladeshLocations[division]) : [];
-  const upazilaThanas = district ? bangladeshLocations[division][district] : [];
-
-  const getSimulatedAreaNames = (type) => {
-    if (type === 'ইউনিয়ন') return ['ইউনিয়ন ১', 'ইউনিয়ন ২', 'ইউনিয়ন ৩', 'ইউনিয়ন ৪', 'ইউনিয়ন ৫'];
-    if (type === 'ওয়ার্ড') return ['ওয়ার্ড ১', 'ওয়ার্ড ২', 'ওয়ার্ড ৩', 'ওয়ার্ড ৪', 'ওয়ার্ড ৫', 'ওয়ার্ড ৬', 'ওয়ার্ড ৭', 'ওয়ার্ড ৮', 'ওয়ার্ড ৯'];
-    return [];
-  };
-
-  return (
-    <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-xl w-full max-w-lg border border-gray-200 my-4">
-      <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">প্রোফাইল তৈরি করুন</h2>
-
-      <div className="mb-4">
-        <label className="block text-gray-700 text-sm font-medium mb-1">আপনার সম্পূর্ণ নাম:</label>
-        <input
-          type="text"
-          className="border rounded-xl w-full py-2.5 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={fullName}
-          onChange={(e) => setFullName(e.target.value)}
-          placeholder="যেমন: মোঃ রফিক"
-        />
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-gray-700 text-sm font-medium mb-1">আপনি কি হিসেবে যুক্ত হতে চান?</label>
-        <select
-          className="border rounded-xl w-full py-2.5 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={userType}
-          onChange={(e) => {
-            setUserType(e.target.value);
-            setProfession('');
-          }}
-        >
-          <option value="">নির্বাচন করুন</option>
-          <option value="সেবাপ্রার্থী">সেবাপ্রার্থী (মালিক / মহাজন - সম্পূর্ণ ফ্রি)</option>
-          <option value="সেবাপ্রদানকারী">সেবাপ্রদানকারী (মিস্ত্রি/ইঞ্জিনিয়ার/দোকানদার - ৫০ টাকা / ৩ মাস)</option>
-        </select>
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-gray-700 text-sm font-medium mb-1">যোগাযোগের নম্বর:</label>
-        <input
-          type="tel"
-          className="border rounded-xl w-full py-2.5 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          value={contactNumber}
-          onChange={(e) => setContactNumber(e.target.value)}
-          maxLength="11"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-        <div>
-          <label className="block text-gray-700 text-sm font-medium mb-1">বিভাগ:</label>
-          <select
-            className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-            value={division}
-            onChange={(e) => { setDivision(e.target.value); setDistrict(''); setUpazilaThana(''); }}
+      {/* শীর্ষ হেডার */}
+      <header className="bg-gradient-to-r from-emerald-800 to-teal-700 text-white sticky top-0 z-30 shadow">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("home")}
+            className="text-left focus:outline-none"
           >
-            <option value="">নির্বাচন করুন</option>
-            {divisions.map((div) => <option key={div} value={div}>{div}</option>)}
-          </select>
-        </div>
+            <h1 className="text-xl font-extrabold tracking-tight">নির্মাণ জোন</h1>
+            <p className="text-[11px] text-emerald-100">NIRMAN ZONE • নির্মাণসেবা মার্কেটপ্লেস</p>
+          </button>
 
-        <div>
-          <label className="block text-gray-700 text-sm font-medium mb-1">জেলা:</label>
-          <select
-            className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-            value={district}
-            onChange={(e) => { setDistrict(e.target.value); setUpazilaThana(''); }}
-            disabled={!division}
-          >
-            <option value="">নির্বাচন করুন</option>
-            {districts.map((dist) => <option key={dist} value={dist}>{dist}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-gray-700 text-sm font-medium mb-1">উপজেলা/থানা:</label>
-        <select
-          className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-          value={upazilaThana}
-          onChange={(e) => { setUpazilaThana(e.target.value); setUnionOrWardType(''); }}
-          disabled={!district}
-        >
-          <option value="">নির্বাচন করুন</option>
-          {upazilaThanas.map((ut) => <option key={ut} value={ut}>{ut}</option>)}
-        </select>
-      </div>
-
-      {upazilaThana && (
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div>
-            <label className="block text-gray-700 text-sm font-medium mb-1">এলাকার ধরন:</label>
-            <select
-              className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-              value={unionOrWardType}
-              onChange={(e) => { setUnionOrWardType(e.target.value); setUnionOrWardName(''); }}
-            >
-              <option value="">নির্বাচন করুন</option>
-              <option value="ইউনিয়ন">ইউনিয়ন</option>
-              <option value="ওয়ার্ড">ওয়ার্ড</option>
-            </select>
-          </div>
-
-          {unionOrWardType && (
-            <div>
-              <label className="block text-gray-700 text-sm font-medium mb-1">{unionOrWardType}-এর নাম:</label>
-              <select
-                className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-                value={unionOrWardName}
-                onChange={(e) => setUnionOrWardName(e.target.value)}
-              >
-                <option value="">নির্বাচন করুন</option>
-                {getSimulatedAreaNames(unionOrWardType).map((name) => <option key={name} value={name}>{name}</option>)}
-              </select>
-            </div>
-          )}
-        </div>
-      )}
-
-      {unionOrWardName && (
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-medium mb-1">গ্রাম/মহল্লার নাম:</label>
-          <input
-            type="text"
-            className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-            value={specificAreaName}
-            onChange={(e) => setSpecificAreaName(e.target.value)}
-            placeholder="যেমন: সোনাডাঙ্গা, খুলনা"
-          />
-        </div>
-      )}
-
-      {userType === 'সেবাপ্রদানকারী' && (
-        <>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-1">পেশা:</label>
-            <select
-              className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-              value={profession}
-              onChange={(e) => setProfession(e.target.value)}
-            >
-              <option value="">নির্বাচন করুন</option>
-              {PROFESSION_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-          </div>
-
-          {profession === 'নির্মাণ সামগ্রী বিক্রেতা' ? (
-            <>
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-medium mb-1">দোকানের নাম:</label>
-                <input
-                  type="text"
-                  className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-                  value={shopName}
-                  onChange={(e) => setShopName(e.target.value)}
-                  placeholder="যেমন: ভাই ভাই হার্ডওয়্যার"
-                />
-              </div>
-              <div className="mb-6">
-                <label className="block text-gray-700 text-sm font-medium mb-1">দোকানের ক্যাটাগরি:</label>
-                <select
-                  className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-                  value={shopCategory}
-                  onChange={(e) => setShopCategory(e.target.value)}
-                >
-                  <option value="">নির্বাচন করুন</option>
-                  {SHOP_CATEGORY_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-              </div>
-            </>
-          ) : (
-            <div className="mb-6">
-              <label className="block text-gray-700 text-sm font-medium mb-1">কাজের অভিজ্ঞতা (সংক্ষেপে):</label>
-              <textarea
-                rows="2"
-                className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-                value={experience}
-                onChange={(e) => setExperience(e.target.value)}
-                placeholder="যেমন: ৫ বছরের রাজমিস্ত্রির কাজের অভিজ্ঞতা"
-              ></textarea>
-            </div>
-          )}
-        </>
-      )}
-
-      {userType === 'সেবাপ্রার্থী' && (
-        <div className="mb-6">
-          <label className="block text-gray-700 text-sm font-medium mb-1">আপনার প্রজেক্টের ধরন:</label>
-          <textarea
-            rows="2"
-            className="border rounded-xl w-full py-2.5 px-3 text-gray-700"
-            value={projectType}
-            onChange={(e) => setProjectType(e.target.value)}
-            placeholder="যেমন: নতুন বাড়ি নির্মাণ"
-          ></textarea>
-        </div>
-      )}
-
-      <button
-        onClick={handleSaveProfile}
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl transition duration-200"
-        disabled={loadingSave}
-      >
-        {loadingSave ? 'সেভ হচ্ছে...' : 'প্রোফাইল সেভ করুন'}
-      </button>
-    </div>
-  );
-         }function DashboardPage({ db, userId, appId, userProfile, setUserProfile, handleLogout, setMessage }) {
-  const [activeTab, setActiveTab] = useState('jobs');
-  const [showJobPostModal, setShowJobPostModal] = useState(false);
-  const [showPostSaveWalletBar, setShowPostSaveWalletBar] = useState(false);
-
-  const [adminUnlocked, setAdminUnlocked] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-
-  const isAdmin = userProfile.contactNumber === ADMIN_LOGIN_NUMBER;
-
-  const isServiceProviderActive = useCallback(() => {
-    if (userProfile.type === 'সেবাপ্রদানকারী') {
-      if (!userProfile.nextPaymentDueDate) return false;
-      const now = new Date();
-      const dueDate = new Date(userProfile.nextPaymentDueDate);
-      return now < dueDate;
-    }
-    return true;
-  }, [userProfile]);
-
-  const getDaysRemaining = useCallback(() => {
-    if (!userProfile?.nextPaymentDueDate) return 0;
-    const diffMs = new Date(userProfile.nextPaymentDueDate).getTime() - Date.now();
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  }, [userProfile?.nextPaymentDueDate]);
-
-  useEffect(() => {
-    if (!db || !userProfile?.contactNumber) return;
-    const mobileDocRef = doc(db, `artifacts/${appId}/public/data/profiles_by_mobile`, userProfile.contactNumber);
-    const unsubscribe = onSnapshot(mobileDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setUserProfile(docSnap.data());
-      }
-    });
-    return () => unsubscribe();
-  }, [db, appId, userProfile?.contactNumber, setUserProfile]);
-
-  useEffect(() => {
-    if (userProfile?.type === 'সেবাপ্রদানকারী' && userProfile?.contactNumber) {
-      const todayKey = new Date().toISOString().slice(0, 10);
-      const storageKey = `nirman_zone_wallet_bar_${userProfile.contactNumber}_${todayKey}`;
-      if (!localStorage.getItem(storageKey)) {
-        setShowPostSaveWalletBar(true);
-      }
-    }
-  }, [userProfile?.type, userProfile?.contactNumber]);
-
-  const dismissPostSaveWalletBar = () => {
-    if (userProfile?.contactNumber) {
-      const todayKey = new Date().toISOString().slice(0, 10);
-      localStorage.setItem(`nirman_zone_wallet_bar_${userProfile.contactNumber}_${todayKey}`, 'seen');
-    }
-    setShowPostSaveWalletBar(false);
-  };
-
-  const openWalletApp = (provider) => {
-    try {
-      const targetUrl = provider === 'nagad' ? 'https://nagad.com.bd' : 'https://www.bkash.com';
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    } catch (err) {
-      setMessage("অ্যাপ খুলতে সমস্যা হলে সরাসরি ফোনের বিকাশ বা নগদ অ্যাপ ওপেন করুন।");
-    }
-  };
-
-  const handleVerifyAdminPin = () => {
-    if (pinInput.trim() === ADMIN_SECRET_PIN) {
-      setAdminUnlocked(true);
-      setPinInput('');
-      setMessage("অ্যাডমিন প্যানেল আনলক হয়েছে!");
-    } else {
-      setMessage("ভুল পিন দিয়েছেন! সঠিক অ্যাডমিন পিন দিন।");
-    }
-  };
-
-  const active = isServiceProviderActive();
-  const remainingDays = getDaysRemaining();
-  const showThreeDayDailyReminder =
-    userProfile.type === 'সেবাপ্রদানকারী' &&
-    active &&
-    remainingDays > 0 &&
-    remainingDays <= 3;
-
-  return (
-    <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-xl w-full max-w-5xl border border-gray-200 flex flex-col">
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4 border-b pb-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">স্বাগতম, {userProfile.fullName}!</h2>
-          <p className="text-xs text-gray-500">
-            {userProfile.type === 'সেবাপ্রার্থী' ? 'সেবাপ্রার্থী (মালিক / মহাজন - ফ্রি)' : userProfile.type}{' '}
-            {userProfile.profession ? `(${userProfile.profession})` : ''}
-          </p>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-2 px-4 rounded-xl"
-        >
-          লগআউট
-        </button>
-      </div>
-
-      {userProfile.type === 'সেবাপ্রদানকারী' && showPostSaveWalletBar && (
-        <div className="mb-4 bg-gradient-to-r from-pink-50 via-white to-orange-50 border border-pink-200 p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
-          <div className="text-xs sm:text-sm text-gray-800">
-            <span className="font-bold text-green-700">✓ প্রোফাইল সেভ হয়েছে!</span>{' '}
-            <span>নিচের বাটনে চাপ দিয়ে সরাসরি বিকাশ বা নগদ অ্যাপে যেতে পারেন:</span>
-          </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openWalletApp('bkash')}
-              className="bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition"
-            >
-              📲 বিকাশ অ্যাপ
-            </button>
-            <button
-              type="button"
-              onClick={() => openWalletApp('nagad')}
-              className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition"
-            >
-              📲 নগদ অ্যাপ
-            </button>
-            <button
-              type="button"
-              onClick={dismissPostSaveWalletBar}
-              className="text-gray-500 hover:text-gray-800 text-xs font-bold px-2 py-1"
-              aria-label="বন্ধ করুন"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showThreeDayDailyReminder && (
-        <div className="mb-5 bg-amber-50 border-l-4 border-amber-500 text-amber-950 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-          <div className="space-y-1">
-            <p className="font-bold text-sm">
-              🔔 আজকের মেসেজ (মেয়াদ শেষের সতর্কবার্তা): আর মাত্র {remainingDays} দিন বাকি!
-            </p>
-            <p className="text-xs text-amber-900">
-              ৯০ দিনের মেয়াদ শেষ হওয়ার পর অ্যাকাউন্ট সাময়িক বন্ধ হয়ে যাবে। সময়মতো ৫০ টাকা বিকাশ বা নগদে পাঠিয়ে মেয়াদ বাড়িয়ে নিন।
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => openWalletApp('bkash')}
-              className="bg-pink-600 hover:bg-pink-700 text-white text-xs font-bold py-2 px-3 rounded-xl"
-            >
-              বিকাশ অ্যাপ
-            </button>
-            <button
-              type="button"
-              onClick={() => openWalletApp('nagad')}
-              className="bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold py-2 px-3 rounded-xl"
-            >
-              নগদ অ্যাপ
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('myProfile')}
-              className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2 px-3 rounded-xl"
-            >
-              পেমেন্ট দিন
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3 mb-6">
-        <button
-          className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
-            activeTab === 'jobs' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-700'
-          }`}
-          onClick={() => setActiveTab('jobs')}
-        >
-          {userProfile.type === 'সেবাপ্রদানকারী' ? 'কাজের তালিকা' : 'আমার পোস্টকৃত কাজ'}
-        </button>
-
-        {userProfile.type === 'সেবাপ্রার্থী' && (
-          <button
-            className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
-              activeTab === 'findProfessionals' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-700'
-            }`}
-            onClick={() => setActiveTab('findProfessionals')}
-          >
-            মিস্ত্রি / সেবা খুঁজুন
-          </button>
-        )}
-
-        <button
-          className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
-            activeTab === 'myProfile' ? 'bg-blue-600 text-white shadow' : 'bg-gray-100 text-gray-700'
-          }`}
-          onClick={() => setActiveTab('myProfile')}
-        >
-          {userProfile.type === 'সেবাপ্রার্থী' ? 'আমার প্রোফাইল (ফ্রি)' : 'আমার প্রোফাইল ও পেমেন্ট'}
-        </button>
-
-        {isAdmin && (
-          <button
-            className={`py-2 px-4 text-sm sm:text-base font-medium rounded-xl transition ${
-              activeTab === 'adminPanel' ? 'bg-purple-600 text-white shadow' : 'bg-purple-100 text-purple-800'
-            }`}
-            onClick={() => setActiveTab('adminPanel')}
-          >
-            অ্যাডমিন প্যানেল {adminUnlocked ? '🔓' : '🔒'}
-          </button>
-        )}
-      </div>
-
-      <div className="flex-grow">
-        {activeTab === 'jobs' && (
-          userProfile.type === 'সেবাপ্রদানকারী' ? (
-            <ServiceProviderJobFeed db={db} appId={appId} isServiceProviderActive={isServiceProviderActive} setActiveTab={setActiveTab} setMessage={setMessage} />
-          ) : (
-            <ServiceSeekerJobPosts db={db} userProfile={userProfile} appId={appId} setShowJobPostModal={setShowJobPostModal} setMessage={setMessage} />
-          )
-        )}
-
-        {activeTab === 'findProfessionals' && userProfile.type === 'সেবাপ্রার্থী' && (
-          <FindProfessionals db={db} appId={appId} setMessage={setMessage} />
-        )}
-
-        {activeTab === 'myProfile' && (
-          <MyProfile
-            db={db}
-            userId={userId}
-            appId={appId}
-            userProfile={userProfile}
-            setUserProfile={setUserProfile}
-            isServiceProviderActive={isServiceProviderActive}
-            setMessage={setMessage}
-          />
-        )}
-
-        {activeTab === 'adminPanel' && isAdmin && (
-          !adminUnlocked ? (
-            <div className="max-w-sm mx-auto bg-purple-50 border border-purple-200 p-6 rounded-2xl text-center space-y-4 my-4">
-              <div className="text-3xl">🔒</div>
-              <h3 className="text-lg font-bold text-purple-900">অ্যাডমিন প্যানেল সুরক্ষিত</h3>
-              <p className="text-xs text-gray-600">পেমেন্ট যাচাই ও অনুমোদন করতে আপনার গোপন পিন দিন:</p>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength="6"
-                placeholder="গোপন পিন লিখুন"
-                value={pinInput}
-                onChange={(e) => setPinInput(e.target.value)}
-                className="w-full border rounded-xl py-2.5 px-4 text-center text-lg tracking-widest font-bold bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-              />
+            {currentUser ? (
               <button
-                onClick={handleVerifyAdminPin}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-2.5 rounded-xl transition"
+                type="button"
+                onClick={() => setActiveTab("profile")}
+                className="bg-white/15 hover:bg-white/25 px-3 py-2 rounded-xl text-xs font-bold"
               >
-                অ্যাডমিন প্যানেল খুলুন
+                {currentUser.fullName.split(" ")[0]}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setActiveTab("profile")}
+                className="bg-amber-400 hover:bg-amber-500 text-slate-900 px-3.5 py-2 rounded-xl text-xs font-extrabold"
+              >
+                লগইন / অ্যাকাউন্ট
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* মেয়াদ শেষ হওয়ার ৭ দিন আগে ও মেয়াদ শেষ হওয়ার দিনের নোটিফিকেশন ব্যানার */}
+      {currentUser && currentUser.accountType === "provider" && !currentUser.isPermanentFree && (
+        <div className="max-w-5xl mx-auto px-4 mt-3">
+          {membership.isExpiredToday && (
+            <div className="bg-rose-100 border-2 border-rose-500 text-rose-900 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-extrabold text-sm">
+                  আজ আপনার সদস্যপদের মেয়াদ শেষ হয়েছে!
+                </p>
+                <p className="text-xs mt-1">
+                  আপনার প্রোফাইল তথ্য মুছে যাবে না, তবে পেইড সদস্যপদ সুবিধা পুনরায় চালু করতে ৫০ টাকা পেমেন্ট করে TrxID জমা দিন।
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0"
+              >
+                এখনই পেমেন্ট করুন
               </button>
             </div>
-          ) : (
-            <AdminPanel db={db} appId={appId} setMessage={setMessage} onLock={() => setAdminUnlocked(false)} />
-          )
-        )}
-      </div>
+          )}
 
-      {showJobPostModal && (
-        <JobPostModal
-          db={db}
-          userId={userId}
-          userProfile={userProfile}
-          appId={appId}
-          setShowJobPostModal={setShowJobPostModal}
-          setMessage={setMessage}
-        />
-      )}
-    </div>
-  );
-          }function AdminPanel({ db, appId, setMessage, onLock }) {
-  const [paymentRequests, setPaymentRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, `artifacts/${appId}/public/data/payment_requests`));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      reqs.sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt));
-      setPaymentRequests(reqs);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [db, appId]);
-
-  const handleApprovePayment = async (req) => {
-    try {
-      const now = new Date();
-      const nextDueDate = new Date(now.setMonth(now.getMonth() + 3)).toISOString();
-
-      const targetMobile = req.contactNumber || req.senderBkashNumber;
-      if (targetMobile) {
-        const mobileDocRef = doc(db, `artifacts/${appId}/public/data/profiles_by_mobile`, targetMobile);
-        await setDoc(mobileDocRef, {
-          lastPaymentDate: new Date().toISOString(),
-          nextPaymentDueDate: nextDueDate,
-          paymentStatus: 'approved'
-        }, { merge: true });
-      }
-
-      if (req.userId) {
-        try {
-          const userDocRef = doc(db, `artifacts/${appId}/users/${req.userId}/userProfile`, 'profile');
-          await updateDoc(userDocRef, {
-            lastPaymentDate: new Date().toISOString(),
-            nextPaymentDueDate: nextDueDate,
-            paymentStatus: 'approved'
-          });
-        } catch (e) {
-          // পুরনো ডকুমেন্ট না থাকলে সমস্যা নেই
-        }
-      }
-
-      const reqDocRef = doc(db, `artifacts/${appId}/public/data/payment_requests`, req.id);
-      await updateDoc(reqDocRef, {
-        status: 'approved',
-        approvedAt: new Date().toISOString()
-      });
-
-      setMessage(`${req.fullName}-এর অ্যাকাউন্ট ৩ মাসের জন্য স্থায়ীভাবে অ্যাক্টিভ করা হয়েছে!`);
-    } catch (error) {
-      setMessage(`অনুমোদন ব্যর্থ: ${error.message}`);
-    }
-  };
-
-  if (loading) return <div className="text-center py-6">পেমেন্ট রিকোয়েস্ট লোড হচ্ছে...</div>;
-
-  return (
-    <div className="p-2">
-      <div className="flex flex-wrap justify-between items-center gap-2 mb-4">
-        <h3 className="text-xl font-bold text-purple-800">বিকাশ ও নগদ পেমেন্ট রিকোয়েস্টসমূহ (৫০ টাকা)</h3>
-        {onLock && (
-          <button
-            onClick={onLock}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 text-xs font-bold py-1.5 px-3 rounded-xl"
-          >
-            🔒 লক করুন
-          </button>
-        )}
-      </div>
-
-      {paymentRequests.length === 0 ? (
-        <p className="text-gray-600">এখনো কোনো পেমেন্ট রিকোয়েস্ট আসেনি।</p>
-      ) : (
-        <div className="space-y-4">
-          {paymentRequests.map(req => {
-            const methodLabel = req.paymentMethod === 'nagad' ? 'নগদ (Nagad)' : 'বিকাশ (bKash)';
-            const badgeColor = req.paymentMethod === 'nagad' ? 'bg-orange-100 text-orange-800' : 'bg-pink-100 text-pink-800';
-            return (
-              <div key={req.id} className="border p-4 rounded-xl bg-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <p className="font-bold text-gray-800">{req.fullName} ({req.profession})</p>
-                    <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${badgeColor}`}>
-                      {methodLabel}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-600">প্রোফাইল নম্বর: <span className="font-mono font-bold text-gray-800">{req.contactNumber || req.senderBkashNumber}</span></p>
-                  <p className="text-sm text-gray-600">যে নম্বর থেকে টাকা পাঠিয়েছে: <span className="font-mono font-bold text-pink-600">{req.senderBkashNumber}</span></p>
-                  <p className="text-sm text-gray-600">TrxID: <span className="font-mono font-bold text-blue-700">{req.trxId}</span> | পরিমাণ: ৫০ টাকা</p>
-                  <p className="text-xs text-gray-400">সময়: {new Date(req.submittedAt).toLocaleString('bn-BD')}</p>
-                </div>
-                <div>
-                  {req.status === 'pending' ? (
-                    <button
-                      onClick={() => handleApprovePayment(req)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-xl text-sm"
-                    >
-                      Approve (৩ মাস অ্যাক্টিভ করুন)
-                    </button>
-                  ) : (
-                    <span className="bg-green-100 text-green-800 text-xs font-bold px-3 py-1.5 rounded-full">
-                      অনুমোদিত (Active)
-                    </span>
-                  )}
-                </div>
+          {!membership.isExpiredToday && membership.isExpiringSoon && (
+            <div className="bg-amber-100 border-2 border-amber-500 text-amber-950 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-extrabold text-sm">
+                  সতর্কবার্তা: আপনার সদস্যপদের মেয়াদ আর মাত্র {membership.daysLeft} দিন বাকি!
+                </p>
+                <p className="text-xs mt-1">
+                  মেয়াদ শেষ হলে অ্যাকাউন্টের তথ্য থাকবে, কিন্তু পেইড সুবিধা বন্ধ হয়ে যাবে। সময়মতো রিনিউ করুন।
+                </p>
               </div>
-            );
-          })}
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0"
+              >
+                সদস্যপদ রিনিউ করুন
+              </button>
+            </div>
+          )}
+
+          {!membership.isActive && !membership.isExpiredToday && (
+            <div className="bg-slate-200 border border-slate-400 text-slate-900 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-extrabold text-sm">আপনার পেইড সদস্যপদ বর্তমানে সক্রিয় নয়।</p>
+                <p className="text-xs mt-1">
+                  আপনার প্রোফাইল সংরক্ষিত আছে। {settings.subscriptionFee} টাকা / {settings.subscriptionDays} দিনের সদস্যপদ চালু করতে TrxID জমা দিন।
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(true)}
+                className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-4 py-2.5 rounded-xl text-xs shrink-0"
+              >
+                পেমেন্ট জমা দিন
+              </button>
+            </div>
+          )}
         </div>
       )}
-    </div>
-  );
-}
 
-function ServiceSeekerJobPosts({ db, userProfile, appId, setShowJobPostModal, setMessage }) {
-  const [myJobPosts, setMyJobPosts] = useState([]);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+      {/* মূল কনটেন্ট এরিয়া */}
+      <main className="max-w-5xl mx-auto px-4 pt-4">
+        {/* ==================== হোম ট্যাব ==================== */}
+        {activeTab === "home" && (
+          <div className="space-y-5">
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+              <h2 className="text-xl font-extrabold text-slate-900">
+                বাড়ির মালিক, মিস্ত্রি, ঠিকাদার ও নির্মাণসামগ্রীর বিশ্বস্ত ঠিকানা
+              </h2>
+              <p className="text-sm text-slate-600 mt-1">
+                মালিক ও মহাজনের জন্য সম্পূর্ণ ফ্রি। সার্ভিস প্রোভাইডারের সদস্যপদ মাত্র {settings.subscriptionFee} টাকা ({settings.subscriptionDays} দিন)।
+              </p>
 
-  useEffect(() => {
-    if (!db || !userProfile) return;
-    const q = query(collection(db, `artifacts/${appId}/public/data/job_posts`));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMyJobPosts(posts.filter(post => post.postedByMobile === userProfile.contactNumber || post.postedByUserId === userProfile.userId));
-      setLoadingJobs(false);
-    });
-    return () => unsubscribe();
-  }, [db, userProfile, appId]);
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("providers")}
+                  className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 p-3.5 rounded-2xl text-left transition"
+                >
+                  <p className="font-extrabold text-emerald-900 text-sm">মিস্ত্রি খুঁজুন</p>
+                  <p className="text-xs text-emerald-700 mt-0.5">{filteredProviders.length} জন সক্রিয়</p>
+                </button>
 
-  const handleDeleteJob = async (jobId) => {
-    try {
-      await deleteDoc(doc(db, `artifacts/${appId}/public/data/job_posts`, jobId));
-      setConfirmDeleteId(null);
-      setMessage("কাজের পোস্টটি সফলভাবে মুছে ফেলা হয়েছে!");
-    } catch (error) {
-      setMessage(`পোস্ট মুছতে ব্যর্থ: ${error.message}`);
-    }
-  };
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("jobs")}
+                  className="bg-blue-50 hover:bg-blue-100 border border-blue-200 p-3.5 rounded-2xl text-left transition"
+                >
+                  <p className="font-extrabold text-blue-900 text-sm">কাজের বিজ্ঞাপন</p>
+                  <p className="text-xs text-blue-700 mt-0.5">{jobs.filter((j) => j.status === "open").length} টি খোলা কাজ</p>
+                </button>
 
-  if (loadingJobs) return <div className="text-center text-gray-600">লোড হচ্ছে...</div>;
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("shops")}
+                  className="bg-amber-50 hover:bg-amber-100 border border-amber-200 p-3.5 rounded-2xl text-left transition"
+                >
+                  <p className="font-extrabold text-amber-900 text-sm">নির্মাণসামগ্রীর দোকান</p>
+                  <p className="text-xs text-amber-700 mt-0.5">{shops.length} টি দোকান</p>
+                </button>
 
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-semibold text-gray-800">আপনার পোস্ট করা কাজ</h3>
-        <button
-          onClick={() => setShowJobPostModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-xl text-sm"
-        >
-          + নতুন কাজের পোস্ট
-        </button>
-      </div>
-      {myJobPosts.length === 0 ? (
-        <p className="text-gray-600 text-center py-10">আপনি এখনো কোনো কাজের পোস্ট করেননি।</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {myJobPosts.map(job => (
-            <div key={job.id} className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex flex-col justify-between">
-              <div>
-                <h4 className="text-lg font-bold text-blue-800 mb-1">{job.title}</h4>
-                <p className="text-gray-700 text-sm mb-2">{job.description}</p>
-                <p className="text-gray-600 text-xs">প্রয়োজনীয় পেশা: <span className="font-semibold">{job.requiredProfession}</span></p>
-                <p className="text-gray-600 text-xs">অবস্থান: {job.specificAreaName}, {job.upazilaThana}, {job.district}</p>
-              </div>
-
-              <div className="mt-4 pt-3 border-t border-blue-200 flex items-center justify-between gap-2">
-                {confirmDeleteId === job.id ? (
-                  <div className="flex items-center gap-2 w-full">
-                    <span className="text-xs text-red-700 font-semibold">নিশ্চিত মুছবেন?</span>
-                    <button
-                      onClick={() => handleDeleteJob(job.id)}
-                      className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-1.5 px-3 rounded-lg"
-                    >
-                      হ্যাঁ, মুছুন
-                    </button>
-                    <button
-                      onClick={() => setConfirmDeleteId(null)}
-                      className="bg-gray-300 text-gray-800 text-xs font-bold py-1.5 px-3 rounded-lg"
-                    >
-                      না
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setConfirmDeleteId(job.id)}
-                    className="bg-red-100 hover:bg-red-200 text-red-700 text-xs font-bold py-1.5 px-3 rounded-lg transition"
-                  >
-                    🗑️ কাজ সম্পন্ন / পোস্ট মুছুন
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!currentUser) {
+                      setActiveTab("profile");
+                      showToast("কাজের বিজ্ঞাপন দিতে আগে অ্যাকাউন্ট খুলুন বা লগইন করুন।", "info");
+                    } else {
+                      setShowJobModal(true);
+                    }
+                  }}
+                  className="bg-teal-700 hover:bg-teal-800 text-white p-3.5 rounded-2xl text-left transition shadow-sm"
+                >
+                  <p className="font-extrabold text-sm">+ কাজের বিজ্ঞাপন দিন</p>
+                  <p className="text-xs text-teal-100 mt-0.5">মালিক/মহাজন ফ্রি</p>
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-      }function ServiceProviderJobFeed({ db, appId, isServiceProviderActive, setActiveTab }) {
-  const [jobPosts, setJobPosts] = useState([]);
-  const [loadingJobs, setLoadingJobs] = useState(true);
-  const [filterProfession, setFilterProfession] = useState('');
-  const [filterDistrict, setFilterDistrict] = useState('');
 
-  useEffect(() => {
-    if (!db) return;
-    const q = query(collection(db, `artifacts/${appId}/public/data/job_posts`));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const posts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setJobPosts(posts);
-      setLoadingJobs(false);
-    });
-    return () => unsubscribe();
-  }, [db, appId]);
-
-  const active = isServiceProviderActive();
-
-  const filteredJobPosts = jobPosts.filter(job => {
-    const matchesProfession = filterProfession === '' || job.requiredProfession === filterProfession;
-    const matchesDistrict = filterDistrict === '' || job.district.includes(filterDistrict);
-    return matchesProfession && matchesDistrict;
-  });
-
-  if (loadingJobs) return <div className="text-center text-gray-600">কাজের পোস্ট লোড হচ্ছে...</div>;
-
-  return (
-    <div>
-      {!active && (
-        <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-4 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <div>
-            <p className="font-bold">আপনার অ্যাকাউন্টটি বর্তমানে নিষ্ক্রিয় (Disconnected)!</p>
-            <p className="text-sm">কাজের যোগাযোগ নম্বর দেখতে এবং প্রোফাইল সচল রাখতে মাত্র ৫০ টাকা বিকাশ বা নগদে পাঠিয়ে ৩ মাসের জন্য অ্যাক্টিভ করুন।</p>
-          </div>
-          <button
-            onClick={() => setActiveTab('myProfile')}
-            className="bg-pink-600 hover:bg-pink-700 text-white font-bold py-2 px-4 rounded-xl text-sm whitespace-nowrap"
-          >
-            বিকাশ / নগদে ৫০ টাকা দিন
-          </button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <select
-          value={filterProfession}
-          onChange={(e) => setFilterProfession(e.target.value)}
-          className="p-2.5 border rounded-xl text-sm"
-        >
-          <option value="">সকল পেশার কাজ</option>
-          {PROFESSION_OPTIONS.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="জেলার নাম লিখে খুঁজুন (যেমন: খুলনা)"
-          value={filterDistrict}
-          onChange={(e) => setFilterDistrict(e.target.value)}
-          className="p-2.5 border rounded-xl text-sm"
-        />
-      </div>
-
-      {filteredJobPosts.length === 0 ? (
-        <p className="text-gray-600 text-center py-10">এই মুহূর্তে কোনো কাজ উপলব্ধ নেই।</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredJobPosts.map(job => (
-            <div key={job.id} className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex flex-col justify-between">
-              <div>
-                <h4 className="text-lg font-bold text-blue-800 mb-1">{job.title}</h4>
-                <p className="text-gray-700 text-sm mb-2">{job.description}</p>
-                <p className="text-gray-600 text-xs">পেশা: <span className="font-semibold">{job.requiredProfession}</span></p>
-                <p className="text-gray-600 text-xs">স্থান: {job.specificAreaName}, {job.upazilaThana}, {job.district}</p>
+            {/* সাম্প্রতিক কাজের বিজ্ঞাপন */}
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base font-extrabold text-slate-900">সাম্প্রতিক কাজের বিজ্ঞাপন</h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("jobs")}
+                  className="text-xs font-bold text-emerald-700 hover:underline"
+                >
+                  সব দেখুন →
+                </button>
               </div>
-
-              {active ? (
-                <div className="mt-4 pt-3 border-t border-blue-200 flex items-center justify-between gap-2">
-                  <span className="text-green-800 text-sm font-bold font-mono">{job.contactNumber}</span>
-                  <a
-                    href={`tel:${job.contactNumber}`}
-                    className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition inline-flex items-center gap-1"
-                  >
-                    📞 কল করুন
-                  </a>
-                </div>
+              {jobs.filter((j) => j.status === "open").slice(0, 3).length === 0 ? (
+                <p className="text-sm text-slate-500 py-4 text-center">এই মুহূর্তে কোনো নতুন কাজের বিজ্ঞাপন নেই।</p>
               ) : (
-                <div className="mt-3 bg-gray-200 p-2 rounded-lg text-center">
-                  <span className="text-xs font-bold text-red-600">নম্বর দেখতে ৫০ টাকা দিয়ে অ্যাকাউন্ট অ্যাক্টিভ করুন</span>
+                <div className="space-y-3">
+                  {jobs
+                    .filter((j) => j.status === "open")
+                    .slice(0, 3)
+                    .map((job) => (
+                      <div
+                        key={job.id}
+                        className="border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      >
+                        <div>
+                          <span className="inline-block bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
+                            {job.category}
+                          </span>
+                          <h4 className="font-bold text-slate-900 mt-1">{job.title}</h4>
+                          <p className="text-xs text-slate-600 mt-0.5">
+                            {job.areaDetail ? `${job.areaDetail}, ` : ""}
+                            {job.upazila}, {job.district}, {job.division}
+                          </p>
+                        </div>
+                        <a
+                          href={`tel:${cleanPhone(job.contactPhone)}`}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-sm text-center shrink-0"
+                        >
+                          ফোন করুন
+                        </a>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+          </div>
+        )}
 
-function FindProfessionals({ db, appId }) {
-  const [professionals, setProfessionals] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filterProfession, setFilterProfession] = useState('');
-  const [filterDistrict, setFilterDistrict] = useState('');
-
-  useEffect(() => {
-    if (!db) return;
-    const profilesColRef = collection(db, `artifacts/${appId}/public/data/profiles_by_mobile`);
-    const unsubscribe = onSnapshot(profilesColRef, (snapshot) => {
-      const fetched = snapshot.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(p => p.type === 'সেবাপ্রদানকারী');
-      setProfessionals(fetched);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [db, appId]);
-
-  const now = new Date();
-  const activeProfessionals = professionals.filter(p => {
-    const isActive = p.nextPaymentDueDate && now < new Date(p.nextPaymentDueDate);
-    const matchesProf = filterProfession === '' || p.profession === filterProfession;
-    const matchesDist = filterDistrict === '' || (p.district && p.district.includes(filterDistrict));
-    return isActive && matchesProf && matchesDist;
-  });
-
-  if (loading) return <div className="text-center text-gray-600">তথ্য লোড হচ্ছে...</div>;
-
-  return (
-    <div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <select
-          value={filterProfession}
-          onChange={(e) => setFilterProfession(e.target.value)}
-          className="p-2.5 border rounded-xl text-sm"
-        >
-          <option value="">সকল সক্রিয় পেশাজীবী</option>
-          {PROFESSION_OPTIONS.map(p => (
-            <option key={p} value={p}>{p}</option>
-          ))}
-        </select>
-        <input
-          type="text"
-          placeholder="জেলার নাম লিখে খুঁজুন (যেমন: খুলনা)"
-          value={filterDistrict}
-          onChange={(e) => setFilterDistrict(e.target.value)}
-          className="p-2.5 border rounded-xl text-sm"
-        />
-      </div>
-
-      {activeProfessionals.length === 0 ? (
-        <p className="text-gray-600 text-center py-10">এই মুহূর্তে কোনো সক্রিয় সেবাপ্রদানকারী পাওয়া যায়নি।</p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {activeProfessionals.map(prof => (
-            <div key={prof.id} className="bg-green-50 p-5 rounded-xl border border-green-100 flex flex-col justify-between">
+        {/* ==================== কাজের বিজ্ঞাপন ট্যাব ==================== */}
+        {activeTab === "jobs" && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h4 className="text-lg font-bold text-green-800">{prof.fullName}</h4>
-                <p className="text-sm font-semibold text-gray-700">পেশা: {prof.profession}</p>
-                {prof.profession === 'নির্মাণ সামগ্রী বিক্রেতা' ? (
-                  <p className="text-xs text-gray-600 mt-1">দোকান: {prof.shopName} ({prof.shopCategory})</p>
-                ) : (
-                  <p className="text-xs text-gray-600 mt-1">অভিজ্ঞতা: {prof.experience || 'উল্লেখ নেই'}</p>
-                )}
-                <p className="text-xs text-gray-600 mt-1">ঠিকানা: {prof.specificAreaName}, {prof.upazilaThana}, {prof.district}</p>
+                <h2 className="text-lg font-extrabold text-slate-900">কাজের বিজ্ঞাপনসমূহ</h2>
+                <p className="text-xs text-slate-600">বাড়ির মালিক ও মহাজনের দেওয়া কাজ দেখুন এবং সরাসরি কথা বলুন</p>
               </div>
-
-              <div className="mt-4 pt-3 border-t border-green-200 flex items-center justify-between gap-2">
-                <span className="text-blue-800 text-sm font-bold font-mono">{prof.contactNumber}</span>
-                <a
-                  href={`tel:${prof.contactNumber}`}
-                  className="bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 px-3.5 rounded-xl shadow-sm transition inline-flex items-center gap-1"
-                >
-                  📞 কল করুন
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-      }function MyProfile({ db, userId, appId, userProfile, setUserProfile, isServiceProviderActive, setMessage }) {
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('bkash');
-  const [senderNumber, setSenderNumber] = useState('');
-  const [trxId, setTrxId] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState(userProfile.fullName || '');
-  const [editDivision, setEditDivision] = useState(userProfile.division || '');
-  const [editDistrict, setEditDistrict] = useState(userProfile.district || '');
-  const [editUpazila, setEditUpazila] = useState(userProfile.upazilaThana || '');
-  const [editArea, setEditArea] = useState(userProfile.specificAreaName || '');
-  const [editProfession, setEditProfession] = useState(userProfile.profession || '');
-  const [editExperience, setEditExperience] = useState(userProfile.experience || '');
-  const [editShopName, setEditShopName] = useState(userProfile.shopName || '');
-  const [editShopCategory, setEditShopCategory] = useState(userProfile.shopCategory || '');
-  const [editProjectType, setEditProjectType] = useState(userProfile.projectType || '');
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  const FEE_AMOUNT = 50;
-
-  const calculateDaysRemaining = (dueDateISO) => {
-    if (!dueDateISO) return 0;
-    const dueDate = new Date(dueDateISO);
-    const now = new Date();
-    const diffTime = dueDate.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
-  };
-
-  const handleOpenEdit = () => {
-    setEditName(userProfile.fullName || '');
-    setEditDivision(userProfile.division || '');
-    setEditDistrict(userProfile.district || '');
-    setEditUpazila(userProfile.upazilaThana || '');
-    setEditArea(userProfile.specificAreaName || '');
-    setEditProfession(userProfile.profession || '');
-    setEditExperience(userProfile.experience || '');
-    setEditShopName(userProfile.shopName || '');
-    setEditShopCategory(userProfile.shopCategory || '');
-    setEditProjectType(userProfile.projectType || '');
-    setIsEditing(true);
-  };
-
-  const handleSaveProfileEdit = async () => {
-    if (!editName.trim() || !editDivision || !editDistrict || !editUpazila || !editArea.trim()) {
-      setMessage("নাম এবং ঠিকানার সকল ঘর পূরণ করুন।");
-      return;
-    }
-
-    setSavingEdit(true);
-    try {
-      const updatedFields = {
-        fullName: editName.trim(),
-        division: editDivision,
-        district: editDistrict,
-        upazilaThana: editUpazila,
-        specificAreaName: editArea.trim(),
-      };
-
-      if (userProfile.type === 'সেবাপ্রদানকারী') {
-        if (editProfession) updatedFields.profession = editProfession;
-        if (editProfession === 'নির্মাণ সামগ্রী বিক্রেতা') {
-          updatedFields.shopName = editShopName.trim();
-          updatedFields.shopCategory = editShopCategory;
-        } else {
-          updatedFields.experience = editExperience.trim();
-        }
-      } else {
-        updatedFields.projectType = editProjectType.trim();
-      }
-
-      const mobileDocRef = doc(db, `artifacts/${appId}/public/data/profiles_by_mobile`, userProfile.contactNumber);
-      await setDoc(mobileDocRef, updatedFields, { merge: true });
-
-      setUserProfile(prev => ({ ...prev, ...updatedFields }));
-      setIsEditing(false);
-      setMessage("আপনার প্রোফাইল সফলভাবে আপডেট হয়েছে!");
-    } catch (error) {
-      setMessage(`আপডেট ব্যর্থ: ${error.message}`);
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const handleSubmitPaymentInfo = async () => {
-    const methodTitle = paymentMethod === 'nagad' ? 'নগদ' : 'বিকাশ';
-    if (senderNumber.length !== 11 || !trxId.trim()) {
-      setMessage(`অনুগ্রহ করে সঠিক ১১ ডিজিটের ${methodTitle} নম্বর এবং ট্রানজেকশন আইডি (TrxID) দিন।`);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await addDoc(collection(db, `artifacts/${appId}/public/data/payment_requests`), {
-        userId: userId,
-        contactNumber: userProfile.contactNumber,
-        fullName: userProfile.fullName,
-        profession: userProfile.profession,
-        amount: FEE_AMOUNT,
-        paymentMethod: paymentMethod,
-        senderBkashNumber: senderNumber.trim(),
-        trxId: trxId.trim().toUpperCase(),
-        status: 'pending',
-        submittedAt: new Date().toISOString()
-      });
-
-      const mobileDocRef = doc(db, `artifacts/${appId}/public/data/profiles_by_mobile`, userProfile.contactNumber);
-      await setDoc(mobileDocRef, {
-        paymentStatus: 'pending'
-      }, { merge: true });
-
-      setUserProfile(prev => ({ ...prev, paymentStatus: 'pending' }));
-      setMessage(`আপনার ${methodTitle} পেমেন্টের তথ্য জমা হয়েছে! যাচাইয়ের পর ৩ মাসের জন্য অ্যাকাউন্ট চালু হয়ে যাবে।`);
-      setShowPaymentModal(false);
-      setSenderNumber('');
-      setTrxId('');
-    } catch (error) {
-      setMessage(`তথ্য জমা দিতে ব্যর্থ: ${error.message}`);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const daysRemaining = userProfile.type === 'সেবাপ্রদানকারী' ? calculateDaysRemaining(userProfile.nextPaymentDueDate) : null;
-  const active = isServiceProviderActive();
-  const targetWalletNumber = paymentMethod === 'nagad' ? ADMIN_NAGAD_NUMBER : ADMIN_BKASH_NUMBER;
-
-  const editDivisions = Object.keys(bangladeshLocations);
-  const editDistricts = editDivision && bangladeshLocations[editDivision] ? Object.keys(bangladeshLocations[editDivision]) : [];
-  const editUpazilas = editDivision && editDistrict && bangladeshLocations[editDivision]?.[editDistrict] ? bangladeshLocations[editDivision][editDistrict] : [];
-
-  return (
-    <div>
-      <div className="bg-gray-50 p-5 rounded-xl border border-gray-200 mb-6 space-y-2 text-sm sm:text-base">
-        <div className="flex justify-between items-center border-b pb-3 mb-3">
-          <h3 className="font-bold text-gray-800 text-base sm:text-lg">ব্যক্তিগত তথ্য</h3>
-          {!isEditing && (
-            <button
-              onClick={handleOpenEdit}
-              className="bg-blue-100 hover:bg-blue-200 text-blue-800 text-xs font-bold py-1.5 px-3.5 rounded-xl transition"
-            >
-              ✏️ প্রোফাইল এডিট করুন
-            </button>
-          )}
-        </div>
-
-        {isEditing ? (
-          <div className="space-y-3 bg-white p-4 rounded-xl border border-blue-200">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">সম্পূর্ণ নাম:</label>
-              <input
-                type="text"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="border rounded-xl w-full py-2 px-3 text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">বিভাগ:</label>
-                <select
-                  value={editDivision}
-                  onChange={(e) => { setEditDivision(e.target.value); setEditDistrict(''); setEditUpazila(''); }}
-                  className="border rounded-xl w-full py-2 px-3 text-sm"
-                >
-                  <option value="">নির্বাচন করুন</option>
-                  {editDivisions.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">জেলা:</label>
-                <select
-                  value={editDistrict}
-                  onChange={(e) => { setEditDistrict(e.target.value); setEditUpazila(''); }}
-                  className="border rounded-xl w-full py-2 px-3 text-sm"
-                  disabled={!editDivision}
-                >
-                  <option value="">নির্বাচন করুন</option>
-                  {editDistricts.map(dist => <option key={dist} value={dist}>{dist}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">উপজেলা/থানা:</label>
-              <select
-                value={editUpazila}
-                onChange={(e) => setEditUpazila(e.target.value)}
-                className="border rounded-xl w-full py-2 px-3 text-sm"
-                disabled={!editDistrict}
+              <button
+                type="button"
+                onClick={() => {
+                  if (!currentUser) {
+                    setActiveTab("profile");
+                    showToast("বিজ্ঞাপন দিতে আগে লগইন বা রেজিস্ট্রেশন করুন।", "info");
+                  } else {
+                    setShowJobModal(true);
+                  }
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-xl text-sm"
               >
-                <option value="">নির্বাচন করুন</option>
-                {editUpazilas.map(ut => <option key={ut} value={ut}>{ut}</option>)}
+                + নতুন কাজের বিজ্ঞাপন
+              </button>
+            </div>
+
+            {jobs.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm border border-slate-200">
+                এখনো কোনো কাজের বিজ্ঞাপন দেওয়া হয়নি।
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {jobs.map((job) => {
+                  const isOwnerOfPost =
+                    currentUser && cleanPhone(job.ownerPhone) === cleanPhone(currentUser.phone);
+                  return (
+                    <div
+                      key={job.id}
+                      className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full">
+                            {job.category}
+                          </span>
+                          <span
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                              job.status === "open"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {job.status === "open" ? "কাজ চলছে / খোলা" : "কাজ সম্পন্ন"}
+                          </span>
+                        </div>
+
+                        <h3 className="text-base font-extrabold text-slate-900 mt-2">{job.title}</h3>
+                        {job.professionNeeded && (
+                          <p className="text-xs font-semibold text-teal-800 mt-0.5">
+                            প্রয়োজনীয় পেশা: {job.professionNeeded}
+                          </p>
+                        )}
+                        <p className="text-sm text-slate-700 mt-2 whitespace-pre-line">{job.description}</p>
+
+                        {job.photo && (
+                          <img
+                            src={job.photo}
+                            alt={job.title}
+                            className="mt-3 w-full h-44 object-cover rounded-xl border border-slate-200"
+                          />
+                        )}
+
+                        <div className="mt-3 text-xs text-slate-600 space-y-1 bg-slate-50 p-3 rounded-xl">
+                          <p>
+                            <strong>ঠিকানা:</strong> {job.areaDetail ? `${job.areaDetail}, ` : ""}
+                            {job.upazila}, {job.district}, {job.division}
+                          </p>
+                          {job.budget && (
+                            <p>
+                              <strong>সম্ভাব্য বাজেট:</strong> {job.budget}
+                            </p>
+                          )}
+                          {job.startDate && (
+                            <p>
+                              <strong>কাজ শুরুর তারিখ:</strong> {job.startDate}
+                            </p>
+                          )}
+                          <p>
+                            <strong>বিজ্ঞাপনদাতা:</strong> {job.ownerName} ({job.contactPhone})
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                        {job.status === "open" && (
+                          <a
+                            href={`tel:${cleanPhone(job.contactPhone)}`}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-4 rounded-xl text-sm text-center"
+                          >
+                            ফোন করুন ({job.contactPhone})
+                          </a>
+                        )}
+
+                        {isOwnerOfPost && job.status === "open" && (
+                          <button
+                            type="button"
+                            onClick={() => handleCloseJob(job.id)}
+                            className="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-3.5 rounded-xl text-xs"
+                          >
+                            কাজ সম্পন্ন / বন্ধ করুন
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReportTarget({
+                              type: "job",
+                              id: job.id,
+                              name: job.title,
+                              phone: job.contactPhone,
+                            })
+                          }
+                          className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2.5 px-3 rounded-xl text-xs"
+                        >
+                          রিপোর্ট
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== মিস্ত্রি ও সার্ভিস প্রোভাইডার খোঁজা ==================== */}
+        {activeTab === "providers" && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+              <h2 className="text-lg font-extrabold text-slate-900">
+                মিস্ত্রি ও সার্ভিস প্রোভাইডার খুঁজুন
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <select
+                  value={searchProf}
+                  onChange={(e) => setSearchProf(e.target.value)}
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                >
+                  <option value="">সকল পেশা</option>
+                  {SERVICE_PROVIDER_PROFESSIONS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={searchDiv}
+                  onChange={(e) => {
+                    setSearchDiv(e.target.value);
+                    setSearchDist("");
+                    setSearchUpazila("");
+                  }}
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                >
+                  <option value="">সকল বিভাগ</option>
+                  {Object.keys(BANGLADESH_LOCATIONS).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={searchDist}
+                  onChange={(e) => {
+                    setSearchDist(e.target.value);
+                    setSearchUpazila("");
+                  }}
+                  disabled={!searchDiv}
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white disabled:bg-slate-100"
+                >
+                  <option value="">সকল জেলা</option>
+                  {searchDistricts.map((dist) => (
+                    <option key={dist} value={dist}>
+                      {dist}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={searchUpazila}
+                  onChange={(e) => setSearchUpazila(e.target.value)}
+                  disabled={!searchDist}
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white disabled:bg-slate-100"
+                >
+                  <option value="">সকল উপজেলা/থানা</option>
+                  {searchUpazilas.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="text"
+                  value={searchUnionOrWard}
+                  onChange={(e) => setSearchUnionOrWard(e.target.value)}
+                  placeholder="ইউনিয়ন বা ওয়ার্ড লিখুন"
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+                />
+
+                <input
+                  type="text"
+                  value={searchArea}
+                  onChange={(e) => setSearchArea(e.target.value)}
+                  placeholder="গ্রাম বা মহল্লার নাম লিখুন"
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+                />
+              </div>
+            </div>
+
+            {filteredProviders.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm border border-slate-200">
+                এই অনুযায়ী সক্রিয় কোনো সার্ভিস প্রোভাইডার পাওয়া যায়নি।
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredProviders.map((prov) => (
+                  <div
+                    key={prov.id}
+                    className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between gap-3"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          {prov.profilePhoto ? (
+                            <img
+                              src={prov.profilePhoto}
+                              alt={prov.fullName}
+                              className="w-12 h-12 rounded-full object-cover border border-emerald-200"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-800 font-extrabold flex items-center justify-center text-lg">
+                              {prov.fullName.charAt(0)}
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="font-extrabold text-slate-900 text-base">{prov.fullName}</h3>
+                            <p className="text-xs font-bold text-emerald-700">{prov.profession}</p>
+                          </div>
+                        </div>
+
+                        <span
+                          className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                            prov.lookingForWork
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          কাজ খুঁজছি: {prov.lookingForWork ? "ON" : "OFF"}
+                        </span>
+                      </div>
+
+                      {prov.experience && (
+                        <p className="text-xs text-slate-700 mt-2.5">
+                          <strong>অভিজ্ঞতা:</strong> {prov.experience}
+                        </p>
+                      )}
+                      {prov.bio && (
+                        <p className="text-xs text-slate-600 mt-1 whitespace-pre-line">{prov.bio}</p>
+                      )}
+
+                      <p className="text-xs text-slate-600 mt-2">
+                        <strong>ঠিকানা:</strong>{" "}
+                        {[
+                          prov.villageOrMoholla,
+                          prov.unionOrWard,
+                          prov.upazila,
+                          prov.district,
+                          prov.division,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+
+                      {prov.samplePhoto && (
+                        <img
+                          src={prov.samplePhoto}
+                          alt="কাজের নমুনা"
+                          className="mt-3 w-full h-36 object-cover rounded-xl border border-slate-200"
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                      <a
+                        href={`tel:${cleanPhone(prov.phone)}`}
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl text-sm text-center"
+                      >
+                        ফোন করুন ({prov.phone})
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReportTarget({
+                            type: "provider",
+                            id: prov.id,
+                            name: prov.fullName,
+                            phone: prov.phone,
+                          })
+                        }
+                        className="bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-3 px-3 rounded-xl text-xs"
+                      >
+                        রিপোর্ট
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== নির্মাণসামগ্রীর দোকান ট্যাব ==================== */}
+        {activeTab === "shops" && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+              <h2 className="text-lg font-extrabold text-slate-900">নির্মাণসামগ্রীর দোকানসমূহ</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <select
+                  value={shopFilterCat}
+                  onChange={(e) => setShopFilterCat(e.target.value)}
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                >
+                  <option value="">সকল নির্মাণসামগ্রী</option>
+                  {MATERIAL_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="text"
+                  value={shopFilterDistrict}
+                  onChange={(e) => setShopFilterDistrict(e.target.value)}
+                  placeholder="জেলার নাম দিয়ে খুঁজুন"
+                  className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+                />
+              </div>
+            </div>
+
+            {filteredShops.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center text-slate-500 text-sm border border-slate-200">
+                কোনো নির্মাণসামগ্রীর দোকান পাওয়া যায়নি।
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {filteredShops.map((shop) => (
+                  <div
+                    key={shop.id}
+                    className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-col justify-between gap-3"
+                  >
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-900">{shop.shopName}</h3>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        <strong>মালিক:</strong> {shop.ownerName} • <strong>মোবাইল:</strong>{" "}
+                        {shop.ownerPhone}
+                      </p>
+
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(shop.categories || []).map((cat) => (
+                          <span
+                            key={cat}
+                            className="bg-amber-100 text-amber-900 text-[11px] font-bold px-2 py-0.5 rounded-full"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
+
+                      {shop.description && (
+                        <p className="text-xs text-slate-700 mt-2">{shop.description}</p>
+                      )}
+                      {shop.priceHint && (
+                        <p className="text-xs font-semibold text-emerald-800 mt-1">
+                          দামের তথ্য: {shop.priceHint}
+                        </p>
+                      )}
+
+                      <p className="text-xs text-slate-600 mt-2">
+                        <strong>ঠিকানা:</strong>{" "}
+                        {[
+                          shop.villageOrMoholla,
+                          shop.unionOrWard,
+                          shop.upazila,
+                          shop.district,
+                          shop.division,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      </p>
+
+                      {shop.photo && (
+                        <img
+                          src={shop.photo}
+                          alt={shop.shopName}
+                          className="mt-3 w-full h-36 object-cover rounded-xl border border-slate-200"
+                        />
+                      )}
+                    </div>
+
+                    <a
+                      href={`tel:${cleanPhone(shop.ownerPhone)}`}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 px-4 rounded-xl text-sm text-center"
+                    >
+                      দোকানে ফোন করুন ({shop.ownerPhone})
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== প্রোফাইল ও অ্যাকাউন্ট ট্যাব ==================== */}
+        {activeTab === "profile" && (
+          <div className="space-y-5">
+            {currentUser ? (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+                  <div>
+                    <h2 className="text-lg font-extrabold text-slate-900">{currentUser.fullName}</h2>
+                    <p className="text-xs text-slate-600">
+                      {currentUser.accountType === "owner"
+                        ? "মালিক / মহাজন (স্থায়ী ফ্রি অ্যাকাউন্ট)"
+                        : `সার্ভিস প্রোভাইডার • ${currentUser.profession}`}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-3.5 py-2 rounded-xl text-xs"
+                  >
+                    লগআউট
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  <div className="bg-slate-50 p-3 rounded-xl">
+                    <span className="text-xs text-slate-500 block">মোবাইল নম্বর</span>
+                    <span className="font-bold">{currentUser.phone}</span>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl">
+                    <span className="text-xs text-slate-500 block">সদস্যপদ অবস্থা</span>
+                    <span className="font-bold text-emerald-700">{membership.statusText}</span>
+                  </div>
+                  <div className="bg-slate-50 p-3 rounded-xl sm:col-span-2">
+                    <span className="text-xs text-slate-500 block">ঠিকানা ({currentUser.areaType})</span>
+                    <span className="font-semibold">
+                      {[
+                        currentUser.villageOrMoholla,
+                        currentUser.unionOrWard,
+                        currentUser.upazila,
+                        currentUser.district,
+                        currentUser.division,
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </span>
+                  </div>
+                </div>
+
+                {currentUser.accountType === "provider" && (
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleToggleLookingForWork}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-extrabold ${
+                        currentUser.lookingForWork
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-300 text-slate-800"
+                      }`}
+                    >
+                      আমি কাজ খুঁজছি: {currentUser.lookingForWork ? "ON (চালু)" : "OFF (বন্ধ)"}
+                    </button>
+
+                    {!currentUser.isPermanentFree && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentModal(true)}
+                        className="bg-amber-500 hover:bg-amber-600 text-slate-950 px-4 py-2.5 rounded-xl text-xs font-extrabold"
+                      >
+                        পেমেন্ট / সদস্যপদ রিনিউ ({settings.subscriptionFee} টাকা / {settings.subscriptionDays} দিন)
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* ব্যবহারকারীর নিজের পেমেন্ট হিস্টোরি */}
+                {currentUser.accountType === "provider" && !currentUser.isPermanentFree && (
+                  <div className="pt-3 border-t">
+                    <h3 className="text-sm font-extrabold text-slate-800 mb-2">আমার পেমেন্টসমূহ</h3>
+                    {payments.filter((p) => cleanPhone(p.userPhone) === cleanPhone(currentUser.phone)).length ===
+                    0 ? (
+                      <p className="text-xs text-slate-500">এখনো কোনো পেমেন্ট জমা দেওয়া হয়নি।</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {payments
+                          .filter((p) => cleanPhone(p.userPhone) === cleanPhone(currentUser.phone))
+                          .map((pay) => (
+                            <div
+                              key={pay.id}
+                              className="border rounded-xl p-3 text-xs flex items-center justify-between gap-2"
+                            >
+                              <div>
+                                <p className="font-bold">
+                                  TrxID: {pay.trxId} • {pay.method.toUpperCase()} • {pay.amount} টাকা
+                                </p>
+                                <p className="text-slate-500">{new Date(pay.createdAt).toLocaleString("bn-BD")}</p>
+                              </div>
+                              <span
+                                className={`font-bold px-2.5 py-1 rounded-full ${
+                                  pay.status === "approved"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : pay.status === "rejected"
+                                    ? "bg-rose-100 text-rose-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {pay.status === "approved"
+                                  ? "অনুমোদিত"
+                                  : pay.status === "rejected"
+                                  ? "বাতিল"
+                                  : "যাচাইাধীন"}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 space-y-4">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("login")}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-extrabold ${
+                      authMode === "login"
+                        ? "bg-emerald-700 text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    লগইন করুন
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode("register")}
+                    className={`flex-1 py-2.5 rounded-xl text-sm font-extrabold ${
+                      authMode === "register"
+                        ? "bg-emerald-700 text-white"
+                        : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    নতুন অ্যাকাউন্ট খুলুন
+                  </button>
+                </div>
+
+                {authMode === "login" ? (
+                  <form onSubmit={handleLoginByPhone} className="space-y-3">
+                    <label className="block text-sm font-bold text-slate-700">
+                      আপনার মোবাইল নম্বর (১১ ডিজিট)
+                    </label>
+                    <input
+                      type="tel"
+                      maxLength={11}
+                      value={loginPhone}
+                      onChange={(e) => setLoginPhone(e.target.value)}
+                      placeholder="01XXXXXXXXX"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-3 text-base"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-sm"
+                    >
+                      লগইন করুন
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleRegister} className="space-y-3.5">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        অ্যাকাউন্টের ধরন নির্বাচন করুন
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setRegAccountType("owner")}
+                          className={`p-3 rounded-xl border text-left ${
+                            regAccountType === "owner"
+                              ? "border-emerald-600 bg-emerald-50 font-extrabold text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-700"
+                          }`}
+                        >
+                          <p className="text-sm">মালিক / মহাজন</p>
+                          <p className="text-[11px] font-normal">স্থায়ী সম্পূর্ণ ফ্রি</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRegAccountType("provider")}
+                          className={`p-3 rounded-xl border text-left ${
+                            regAccountType === "provider"
+                              ? "border-emerald-600 bg-emerald-50 font-extrabold text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-700"
+                          }`}
+                        >
+                          <p className="text-sm">সার্ভিস প্রোভাইডার</p>
+                          <p className="text-[11px] font-normal">
+                            {settings.subscriptionFee} টাকা / {settings.subscriptionDays} দিন
+                          </p>
+                        </button>
+                      </div>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="আপনার পূর্ণ নাম *"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    />
+
+                    <input
+                      type="tel"
+                      maxLength={11}
+                      value={regPhone}
+                      onChange={(e) => setRegPhone(e.target.value)}
+                      placeholder="মোবাইল নম্বর (01XXXXXXXXX) *"
+                      className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                    />
+
+                    {regAccountType === "provider" && (
+                      <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                        <select
+                          value={regProfession}
+                          onChange={(e) => setRegProfession(e.target.value)}
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                        >
+                          {SERVICE_PROVIDER_PROFESSIONS.map((p) => (
+                            <option key={p} value={p}>
+                              {p}
+                            </option>
+                          ))}
+                        </select>
+
+                        {isSpecialFreeProvider(regPhone, regProfession) && (
+                          <div className="bg-emerald-100 text-emerald-900 text-xs font-bold p-2.5 rounded-xl">
+                            যাচাইকৃত বিশেষ অ্যাকাউন্ট (01944121530 - গ্রিল মিস্ত্রি): স্থায়ী ফ্রি সদস্যপদ প্রযোজ্য।
+                          </div>
+                        )}
+
+                        <input
+                          type="text"
+                          value={regExperience}
+                          onChange={(e) => setRegExperience(e.target.value)}
+                          placeholder="অভিজ্ঞতা (যেমন: ৮ বছরের কাজ)"
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                        />
+
+                        <textarea
+                          rows={2}
+                          value={regBio}
+                          onChange={(e) => setRegBio(e.target.value)}
+                          placeholder="আপনার কাজের বিবরণ..."
+                          className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+                        />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              প্রোফাইল ছবি (ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                try {
+                                  const url = await readFileAsDataUrl(e.target.files?.[0]);
+                                  setRegProfilePhoto(url);
+                                } catch (err) {
+                                  showToast(err.message, "error");
+                                }
+                              }}
+                              className="text-xs w-full"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              কাজের নমুনা ছবি (ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                try {
+                                  const url = await readFileAsDataUrl(e.target.files?.[0]);
+                                  setRegSamplePhoto(url);
+                                } catch (err) {
+                                  showToast(err.message, "error");
+                                }
+                              }}
+                              className="text-xs w-full"
+                            />
+                          </div>
+                        </div>
+
+                        {/* নির্মাণসামগ্রীর দোকান যুক্ত করার অপশন */}
+                        <div className="pt-2 border-t border-slate-200 space-y-2">
+                          <p className="text-xs font-extrabold text-slate-800">
+                            নির্মাণসামগ্রীর দোকান থাকলে তথ্য দিন (ঐচ্ছিক)
+                          </p>
+                          <input
+                            type="text"
+                            value={regShopName}
+                            onChange={(e) => setRegShopName(e.target.value)}
+                            placeholder="দোকানের নাম"
+                            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                          />
+                          <div className="flex flex-wrap gap-1.5">
+                            {MATERIAL_CATEGORIES.map((cat) => (
+                              <button
+                                type="button"
+                                key={cat}
+                                onClick={() => toggleShopCategory(cat)}
+                                className={`text-[11px] font-bold px-2.5 py-1 rounded-full border ${
+                                  regShopCategories.includes(cat)
+                                    ? "bg-amber-600 text-white border-amber-600"
+                                    : "bg-white text-slate-700 border-slate-300"
+                                }`}
+                              >
+                                {cat}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            type="text"
+                            value={regShopPriceHint}
+                            onChange={(e) => setRegShopPriceHint(e.target.value)}
+                            placeholder="দামের তথ্য (ঐচ্ছিক)"
+                            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                          />
+                          <textarea
+                            rows={2}
+                            value={regShopDesc}
+                            onChange={(e) => setRegShopDesc(e.target.value)}
+                            placeholder="পণ্যের বিবরণ (ঐচ্ছিক)"
+                            className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                          />
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              পণ্যের ছবি (ঐচ্ছিক)
+                            </label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                try {
+                                  const url = await readFileAsDataUrl(e.target.files?.[0]);
+                                  setRegShopPhoto(url);
+                                } catch (err) {
+                                  showToast(err.message, "error");
+                                }
+                              }}
+                              className="text-xs w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ঠিকানা ব্যবস্থা: বিভাগ -> জেলা -> উপজেলা -> ইউনিয়ন/ওয়ার্ড -> গ্রাম/মহল্লা */}
+                    <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                      <p className="text-xs font-extrabold text-slate-800">ঠিকানা নির্বাচন করুন *</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <select
+                          value={regDivision}
+                          onChange={(e) => {
+                            setRegDivision(e.target.value);
+                            setRegDistrict("");
+                            setRegUpazila("");
+                          }}
+                          className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                        >
+                          <option value="">বিভাগ *</option>
+                          {Object.keys(BANGLADESH_LOCATIONS).map((d) => (
+                            <option key={d} value={d}>
+                              {d}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={regDistrict}
+                          onChange={(e) => {
+                            setRegDistrict(e.target.value);
+                            setRegUpazila("");
+                          }}
+                          disabled={!regDivision}
+                          className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-slate-100"
+                        >
+                          <option value="">জেলা *</option>
+                          {regDistricts.map((dist) => (
+                            <option key={dist} value={dist}>
+                              {dist}
+                            </option>
+                          ))}
+                        </select>
+
+                        <select
+                          value={regUpazila}
+                          onChange={(e) => setRegUpazila(e.target.value)}
+                          disabled={!regDistrict}
+                          className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-slate-100"
+                        >
+                          <option value="">উপজেলা/থানা *</option>
+                          {regUpazilas.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <select
+                          value={regAreaType}
+                          onChange={(e) => setRegAreaType(e.target.value)}
+                          className="border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold bg-white"
+                        >
+                          <option value="গ্রাম/ইউনিয়ন">গ্রাম / ইউনিয়ন</option>
+                          <option value="শহর/ওয়ার্ড">শহর / ওয়ার্ড</option>
+                        </select>
+
+                        <input
+                          type="text"
+                          value={regUnionOrWard}
+                          onChange={(e) => setRegUnionOrWard(e.target.value)}
+                          placeholder={
+                            regAreaType === "শহর/ওয়ার্ড"
+                              ? "ওয়ার্ড নম্বর/নাম (যেমন: ওয়ার্ড ৫)"
+                              : "ইউনিয়নের নাম (যেমন: শিমুলিয়া)"
+                          }
+                          className="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                        />
+                      </div>
+
+                      <input
+                        type="text"
+                        value={regVillageOrMoholla}
+                        onChange={(e) => setRegVillageOrMoholla(e.target.value)}
+                        placeholder="গ্রাম বা মহল্লার নাম"
+                        className="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingAuth}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-400 text-white font-extrabold py-3 rounded-xl text-sm"
+                    >
+                      {submittingAuth ? "তৈরি হচ্ছে..." : "রেজিস্ট্রেশন সম্পন্ন করুন"}
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ==================== নিরাপদ অ্যাডমিন প্যানেল ==================== */}
+        {activeTab === "admin" && (
+          <div className="space-y-4">
+            {!isAdminAuthenticated ? (
+              <form
+                onSubmit={handleAdminLogin}
+                className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 max-w-md mx-auto space-y-3"
+              >
+                <h2 className="text-lg font-extrabold text-slate-900">নিরাপদ অ্যাডমিন লগইন</h2>
+                <p className="text-xs text-slate-600">
+                  প্রাথমিক অ্যাডমিন নম্বর: {DEFAULT_ADMIN_PHONE} • গোপন PIN কোডে রাখা হয়নি।
+                </p>
+
+                <input
+                  type="tel"
+                  maxLength={11}
+                  value={adminPhoneInput}
+                  onChange={(e) => setAdminPhoneInput(e.target.value)}
+                  placeholder="অ্যাডমিন মোবাইল নম্বর"
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                />
+
+                <input
+                  type="password"
+                  value={adminPinInput}
+                  onChange={(e) => setAdminPinInput(e.target.value)}
+                  placeholder="গোপন PIN লিখুন"
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                />
+
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={adminOtpInput}
+                    onChange={(e) => setAdminOtpInput(e.target.value)}
+                    placeholder="যাচাই কোড (OTP)"
+                    className="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendAdminOtp}
+                    className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold px-3 rounded-xl text-xs"
+                  >
+                    OTP নিন
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold py-3 rounded-xl text-sm"
+                >
+                  অ্যাডমিন প্যানেলে প্রবেশ করুন
+                </button>
+              </form>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="text-lg font-extrabold text-slate-900">
+                    অ্যাডমিন কন্ট্রোল প্যানেল ({settings.adminPhone})
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminAuthenticated(false)}
+                    className="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-xl text-xs"
+                  >
+                    অ্যাডমিন লগআউট
+                  </button>
+                </div>
+
+                {/* অ্যাডমিন সাব-ট্যাব */}
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    ["overview", "হিসাব ও তালিকা"],
+                    ["payments", `পেমেন্ট (${payments.filter((p) => p.status === "pending").length})`],
+                    ["content", "বিজ্ঞাপন, দোকান ও রিপোর্ট"],
+                    ["settings", "নম্বর, ফি ও মেয়াদ সেটিংস"],
+                    ["logs", "অডিট লগ"],
+                  ].map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setAdminSubTab(key)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-extrabold ${
+                        adminSubTab === key
+                          ? "bg-emerald-700 text-white"
+                          : "bg-white text-slate-700 border"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {adminSubTab === "overview" && (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-white p-4 rounded-2xl border">
+                        <p className="text-xs text-slate-500">মোট ব্যবহারকারী</p>
+                        <p className="text-xl font-extrabold">{users.length}</p>
+                      </div>
+                      <div className="bg-white p-4 rounded-2xl border">
+                        <p className="text-xs text-slate-500">মালিক / মহাজন</p>
+                        <p className="text-xl font-extrabold">{ownersList.length}</p>
+                      </div>
+                      <div className="bg-white p-4 rounded-2xl border">
+                        <p className="text-xs text-slate-500">সার্ভিস প্রোভাইডার</p>
+                        <p className="text-xl font-extrabold">{providersList.length}</p>
+                      </div>
+                      <div className="bg-white p-4 rounded-2xl border">
+                        <p className="text-xs text-slate-500">অনুমোদিত আয়</p>
+                        <p className="text-xl font-extrabold text-emerald-700">
+                          {totalApprovedIncome} টাকা
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border space-y-3">
+                      <h3 className="font-extrabold text-sm">
+                        সকল ব্যবহারকারী (মেয়াদোত্তীর্ণ: {expiredProvidersList.length} জন)
+                      </h3>
+                      <div className="space-y-2">
+                        {users.map((u) => {
+                          const st = getMembershipStatus(u, settings);
+                          return (
+                            <div
+                              key={u.id}
+                              className="border rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+                            >
+                              <div>
+                                <p className="font-bold text-sm">
+                                  {u.fullName} ({u.phone})
+                                </p>
+                                <p className="text-slate-600">
+                                  {u.accountType === "owner"
+                                    ? "মালিক/মহাজন"
+                                    : `সার্ভিস প্রোভাইডার (${u.profession})`}{" "}
+                                  • {st.statusText}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {u.accountType === "provider" && !u.isPermanentFree && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleAdminToggleMembership(u, settings.subscriptionDays)
+                                    }
+                                    className="bg-emerald-600 text-white font-bold px-3 py-1.5 rounded-lg"
+                                  >
+                                    {st.isActive ? "সদস্যপদ বন্ধ করুন" : "সদস্যপদ চালু করুন"}
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdminToggleBlock(u)}
+                                  className={`font-bold px-3 py-1.5 rounded-lg ${
+                                    u.isBlocked
+                                      ? "bg-amber-500 text-slate-950"
+                                      : "bg-rose-600 text-white"
+                                  }`}
+                                >
+                                  {u.isBlocked ? "আনব্লক" : "ব্লক"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {adminSubTab === "payments" && (
+                  <div className="bg-white p-4 rounded-2xl border space-y-3">
+                    <h3 className="font-extrabold text-sm">পেমেন্ট অনুমোদন ও হিসাব</h3>
+                    {payments.length === 0 ? (
+                      <p className="text-xs text-slate-500">কোনো পেমেন্ট রেকর্ড নেই।</p>
+                    ) : (
+                      payments.map((pay) => (
+                        <div
+                          key={pay.id}
+                          className="border rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
+                        >
+                          <div>
+                            <p className="font-bold text-sm">
+                              {pay.userName} ({pay.userPhone}) — {pay.amount} টাকা
+                            </p>
+                            <p className="text-slate-600">
+                              মাধ্যম: {pay.method.toUpperCase()} • TrxID: <strong>{pay.trxId}</strong> •
+                              অবস্থা: {pay.status}
+                            </p>
+                            {pay.screenshot && (
+                              <img
+                                src={pay.screenshot}
+                                alt="পেমেন্ট স্ক্রিনশট"
+                                className="mt-2 w-36 h-24 object-cover rounded-lg border"
+                              />
+                            )}
+                          </div>
+                          {pay.status === "pending" && (
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleApprovePayment(pay)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-2 rounded-xl"
+                              >
+                                অনুমোদন ({pay.days || settings.subscriptionDays} দিন)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRejectPayment(pay)}
+                                className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-3.5 py-2 rounded-xl"
+                              >
+                                বাতিল
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {adminSubTab === "content" && (
+                  <div className="space-y-4">
+                    <div className="bg-white p-4 rounded-2xl border space-y-2">
+                      <h3 className="font-extrabold text-sm">কাজের বিজ্ঞাপন নিয়ন্ত্রণ ({jobs.length})</h3>
+                      {jobs.map((j) => (
+                        <div
+                          key={j.id}
+                          className="border rounded-xl p-3 flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div>
+                            <p className="font-bold">{j.title}</p>
+                            <p className="text-slate-500">
+                              {j.ownerName} ({j.contactPhone}) • {j.status}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteDoc(doc(db, "nirmanzone_jobs", j.id))}
+                            className="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-lg"
+                          >
+                            মুছে ফেলুন
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border space-y-2">
+                      <h3 className="font-extrabold text-sm">
+                        নির্মাণসামগ্রীর দোকান নিয়ন্ত্রণ ({shops.length})
+                      </h3>
+                      {shops.map((s) => (
+                        <div
+                          key={s.id}
+                          className="border rounded-xl p-3 flex items-center justify-between gap-2 text-xs"
+                        >
+                          <div>
+                            <p className="font-bold">{s.shopName}</p>
+                            <p className="text-slate-500">
+                              {s.ownerName} ({s.ownerPhone}) • {s.district}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => deleteDoc(doc(db, "nirmanzone_shops", s.id))}
+                            className="bg-rose-600 text-white font-bold px-3 py-1.5 rounded-lg"
+                          >
+                            মুছে ফেলুন
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="bg-white p-4 rounded-2xl border space-y-2">
+                      <h3 className="font-extrabold text-sm">অভিযোগ ও রিপোর্ট ({reports.length})</h3>
+                      {reports.map((r) => (
+                        <div key={r.id} className="border rounded-xl p-3 text-xs space-y-1">
+                          <p className="font-bold">
+                            টার্গেট: {r.targetName} ({r.targetPhone || r.targetType})
+                          </p>
+                          <p className="text-slate-700">কারণ: {r.reason}</p>
+                          <p className="text-slate-400">রিপোর্টার: {r.reporterPhone}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {adminSubTab === "settings" && (
+                  <form
+                    onSubmit={handleSaveSettings}
+                    className="bg-white p-4 rounded-2xl border space-y-3 max-w-lg"
+                  >
+                    <h3 className="font-extrabold text-sm">
+                      বিকাশ/নগদ নম্বর, ফি, মেয়াদ ও অ্যাডমিন যোগাযোগ তথ্য
+                    </h3>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">বিকাশ নম্বর</label>
+                      <input
+                        type="tel"
+                        value={editSettings.bkashNumber}
+                        onChange={(e) =>
+                          setEditSettings({ ...editSettings, bkashNumber: e.target.value })
+                        }
+                        className="w-full border rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">নগদ নম্বর</label>
+                      <input
+                        type="tel"
+                        value={editSettings.nagadNumber}
+                        onChange={(e) =>
+                          setEditSettings({ ...editSettings, nagadNumber: e.target.value })
+                        }
+                        className="w-full border rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-bold mb-1">সদস্যপদ ফি (টাকা)</label>
+                        <input
+                          type="number"
+                          value={editSettings.subscriptionFee}
+                          onChange={(e) =>
+                            setEditSettings({ ...editSettings, subscriptionFee: e.target.value })
+                          }
+                          className="w-full border rounded-xl px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold mb-1">মেয়াদ (দিন)</label>
+                        <input
+                          type="number"
+                          value={editSettings.subscriptionDays}
+                          onChange={(e) =>
+                            setEditSettings({ ...editSettings, subscriptionDays: e.target.value })
+                          }
+                          className="w-full border rounded-xl px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">অ্যাডমিন মোবাইল নম্বর</label>
+                      <input
+                        type="tel"
+                        value={editSettings.adminPhone}
+                        onChange={(e) =>
+                          setEditSettings({ ...editSettings, adminPhone: e.target.value })
+                        }
+                        className="w-full border rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold mb-1">অ্যাডমিন যোগাযোগের তথ্য</label>
+                      <input
+                        type="text"
+                        value={editSettings.adminEmailOrContact}
+                        onChange={(e) =>
+                          setEditSettings({
+                            ...editSettings,
+                            adminEmailOrContact: e.target.value,
+                          })
+                        }
+                        className="w-full border rounded-xl px-3 py-2 text-sm"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold px-4 py-2.5 rounded-xl text-sm"
+                    >
+                      সেটিংস সংরক্ষণ করুন
+                    </button>
+                  </form>
+                )}
+
+                {adminSubTab === "logs" && (
+                  <div className="bg-white p-4 rounded-2xl border space-y-2">
+                    <h3 className="font-extrabold text-sm">নিরাপত্তা ও কার্যক্রমের রেকর্ড (Audit Log)</h3>
+                    {auditLogs.map((log) => (
+                      <div key={log.id} className="border-b pb-2 text-xs">
+                        <p className="font-bold">
+                          {log.action} • {log.actorPhone}
+                        </p>
+                        <p className="text-slate-600">{log.details}</p>
+                        <p className="text-slate-400">
+                          {new Date(log.createdAt).toLocaleString("bn-BD")}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* ==================== নতুন কাজের বিজ্ঞাপন মডাল ==================== */}
+      {showJobModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <form
+            onSubmit={handleCreateJob}
+            className="bg-white rounded-2xl p-5 max-w-lg w-full space-y-3 shadow-xl my-auto"
+          >
+            <h3 className="text-lg font-extrabold text-slate-900">নতুন কাজের বিজ্ঞাপন দিন</h3>
+
+            <input
+              type="text"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
+              placeholder="কাজের শিরোনাম *"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <select
+                value={jobCategory}
+                onChange={(e) => setJobCategory(e.target.value)}
+                className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+              >
+                {JOB_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={jobProfessionNeeded}
+                onChange={(e) => setJobProfessionNeeded(e.target.value)}
+                className="border border-slate-300 rounded-xl px-3 py-2.5 text-sm bg-white"
+              >
+                <option value="">প্রয়োজনীয় পেশা (ঐচ্ছিক)</option>
+                {SERVICE_PROVIDER_PROFESSIONS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">গ্রাম/মহল্লার নাম:</label>
+            <textarea
+              rows={3}
+              value={jobDesc}
+              onChange={(e) => setJobDesc(e.target.value)}
+              placeholder="কাজের বিস্তারিত বিবরণ *"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <select
+                value={jobDivision}
+                onChange={(e) => {
+                  setJobDivision(e.target.value);
+                  setJobDistrict("");
+                  setJobUpazila("");
+                }}
+                className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white"
+              >
+                <option value="">বিভাগ *</option>
+                {Object.keys(BANGLADESH_LOCATIONS).map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={jobDistrict}
+                onChange={(e) => {
+                  setJobDistrict(e.target.value);
+                  setJobUpazila("");
+                }}
+                disabled={!jobDivision}
+                className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-slate-100"
+              >
+                <option value="">জেলা *</option>
+                {jobDistricts.map((dist) => (
+                  <option key={dist} value={dist}>
+                    {dist}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={jobUpazila}
+                onChange={(e) => setJobUpazila(e.target.value)}
+                disabled={!jobDistrict}
+                className="border border-slate-300 rounded-xl px-3 py-2 text-sm bg-white disabled:bg-slate-100"
+              >
+                <option value="">উপজেলা/থানা *</option>
+                {jobUpazilas.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <input
+              type="text"
+              value={jobAreaDetail}
+              onChange={(e) => setJobAreaDetail(e.target.value)}
+              placeholder="ইউনিয়ন/ওয়ার্ড ও গ্রাম/মহল্লার ঠিকানা"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <input
                 type="text"
-                value={editArea}
-                onChange={(e) => setEditArea(e.target.value)}
-                className="border rounded-xl w-full py-2 px-3 text-sm"
+                value={jobBudget}
+                onChange={(e) => setJobBudget(e.target.value)}
+                placeholder="সম্ভাব্য বাজেট (ঐচ্ছিক)"
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+              />
+              <input
+                type="date"
+                value={jobStartDate}
+                onChange={(e) => setJobStartDate(e.target.value)}
+                className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
               />
             </div>
 
-            {userProfile.type === 'সেবাপ্রদানকারী' ? (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">পেশা:</label>
-                  <select
-                    value={editProfession}
-                    onChange={(e) => setEditProfession(e.target.value)}
-                    className="border rounded-xl w-full py-2 px-3 text-sm"
-                  >
-                    {PROFESSION_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
-                {editProfession === 'নির্মাণ সামগ্রী বিক্রেতা' ? (
-                  <>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">দোকানের নাম:</label>
-                      <input
-                        type="text"
-                        value={editShopName}
-                        onChange={(e) => setEditShopName(e.target.value)}
-                        className="border rounded-xl w-full py-2 px-3 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">দোকানের ক্যাটাগরি:</label>
-                      <select
-                        value={editShopCategory}
-                        onChange={(e) => setEditShopCategory(e.target.value)}
-                        className="border rounded-xl w-full py-2 px-3 text-sm"
-                      >
-                        <option value="">নির্বাচন করুন</option>
-                        {SHOP_CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                  </>
-                ) : (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">কাজের অভিজ্ঞতা:</label>
-                    <input
-                      type="text"
-                      value={editExperience}
-                      onChange={(e) => setEditExperience(e.target.value)}
-                      className="border rounded-xl w-full py-2 px-3 text-sm"
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">প্রজেক্টের ধরন:</label>
-                <input
-                  type="text"
-                  value={editProjectType}
-                  onChange={(e) => setEditProjectType(e.target.value)}
-                  className="border rounded-xl w-full py-2 px-3 text-sm"
-                />
-              </div>
-            )}
+            <input
+              type="tel"
+              maxLength={11}
+              value={jobContactPhone}
+              onChange={(e) => setJobContactPhone(e.target.value)}
+              placeholder="যোগাযোগের মোবাইল নম্বর *"
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+            />
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">
+                কাজের ছবি আপলোড (ঐচ্ছিক)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  try {
+                    const url = await readFileAsDataUrl(e.target.files?.[0]);
+                    setJobPhoto(url);
+                  } catch (err) {
+                    showToast(err.message, "error");
+                  }
+                }}
+                className="text-xs w-full"
+              />
+            </div>
 
             <div className="flex gap-2 pt-2">
               <button
-                onClick={() => setIsEditing(false)}
-                className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-xl text-xs"
-                disabled={savingEdit}
+                type="button"
+                onClick={() => setShowJobModal(false)}
+                className="flex-1 bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-sm"
               >
                 বাতিল
               </button>
               <button
-                onClick={handleSaveProfileEdit}
-                className="w-1/2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-xl text-xs"
-                disabled={savingEdit}
+                type="submit"
+                disabled={postingJob}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-sm"
               >
-                {savingEdit ? 'সেভ হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
+                {postingJob ? "প্রকাশ হচ্ছে..." : "বিজ্ঞাপন প্রকাশ করুন"}
               </button>
             </div>
-          </div>
-        ) : (
-          <>
-            <p><strong className="text-blue-700">নাম:</strong> {userProfile.fullName}</p>
-            <p>
-              <strong className="text-blue-700">ধরন:</strong>{' '}
-              {userProfile.type === 'সেবাপ্রার্থী' ? 'সেবাপ্রার্থী (মালিক / মহাজন)' : userProfile.type}
-            </p>
-            <p><strong className="text-blue-700">মোবাইল:</strong> {userProfile.contactNumber}</p>
-            <p><strong className="text-blue-700">ঠিকানা:</strong> {userProfile.specificAreaName}, {userProfile.unionOrWardName ? `${userProfile.unionOrWardName}, ` : ''}{userProfile.upazilaThana}, {userProfile.district}, {userProfile.division}</p>
+          </form>
+        </div>
+      )}
 
-            {userProfile.type === 'সেবাপ্রার্থী' && (
-              <div className="pt-3 border-t mt-3 space-y-2">
-                {userProfile.projectType && <p><strong className="text-blue-700">প্রজেক্টের ধরন:</strong> {userProfile.projectType}</p>}
-                <span className="inline-block bg-green-100 text-green-800 font-bold px-3 py-1.5 rounded-full text-xs">
-                  মালিক / মহাজন অ্যাকাউন্ট: সম্পূর্ণ ফ্রি (কোনো ফি প্রযোজ্য নয়)
-                </span>
-              </div>
-            )}
-
-            {userProfile.type === 'সেবাপ্রদানকারী' && (
-              <div className="pt-3 border-t mt-3 space-y-2">
-                <p><strong className="text-blue-700">পেশা:</strong> {userProfile.profession}</p>
-                {userProfile.profession === 'নির্মাণ সামগ্রী বিক্রেতা' ? (
-                  <p><strong className="text-blue-700">দোকান:</strong> {userProfile.shopName} ({userProfile.shopCategory})</p>
-                ) : (
-                  userProfile.experience && <p><strong className="text-blue-700">অভিজ্ঞতা:</strong> {userProfile.experience}</p>
-                )}
-                <p>
-                  <strong className="text-blue-700">অ্যাকাউন্ট স্ট্যাটাস:</strong>{' '}
-                  {active ? (
-                    <span className="bg-green-100 text-green-800 font-bold px-2.5 py-1 rounded-full text-xs">
-                      সক্রিয় (Active) - বাকি {daysRemaining} দিন
-                    </span>
-                  ) : (
-                    <span className="bg-red-100 text-red-800 font-bold px-2.5 py-1 rounded-full text-xs">
-                      সংযোগ বিচ্ছিন্ন (Disconnected)
-                    </span>
-                  )}
-                </p>
-                {userProfile.nextPaymentDueDate && active && (
-                  <p className="text-xs text-gray-500">
-                    মেয়াদ শেষ হবে: {new Date(userProfile.nextPaymentDueDate).toLocaleDateString('bn-BD')} (এরপর অটোমেটিক ডিসকানেক্ট হয়ে যাবে)
-                  </p>
-                )}
-
-                {userProfile.paymentStatus === 'pending' && !active && (
-                  <div className="bg-yellow-50 border border-yellow-300 text-yellow-800 p-3 rounded-xl text-sm mt-2">
-                    আপনার ৫০ টাকা পেমেন্টের তথ্য যাচাই করা হচ্ছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন।
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowPaymentModal(true)}
-                  className="mt-4 w-full bg-gradient-to-r from-pink-600 to-orange-600 hover:from-pink-700 hover:to-orange-700 text-white font-bold py-3 px-4 rounded-xl shadow transition"
-                >
-                  {active ? 'মেয়াদ বাড়ান (বিকাশ / নগদ - ৫০ টাকা)' : 'বিকাশ বা নগদে ৫০ টাকা দিয়ে অ্যাক্টিভ করুন'}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
+      {/* ==================== পেমেন্ট ও TrxID মডাল ==================== */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md border border-gray-200">
-            <div className="text-center mb-4">
-              <span className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-xs">
-                bKash / Nagad Send Money
-              </span>
-              <h3 className="text-xl font-bold text-gray-800 mt-2">৩ মাসের সাবস্ক্রিপশন ফি: ৫০ টাকা</h3>
-            </div>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <form
+            onSubmit={handleSubmitPayment}
+            className="bg-white rounded-2xl p-5 max-w-md w-full space-y-3 shadow-xl my-auto"
+          >
+            <h3 className="text-lg font-extrabold text-slate-900">
+              সদস্যপদ পেমেন্ট ({settings.subscriptionFee} টাকা / {settings.subscriptionDays} দিন)
+            </h3>
 
-            <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setPaymentMethod('bkash')}
-                className={`py-2.5 px-3 rounded-xl font-bold text-sm border transition ${
-                  paymentMethod === 'bkash'
-                    ? 'bg-pink-600 text-white border-pink-600 shadow'
-                    : 'bg-pink-50 text-pink-700 border-pink-200'
+                onClick={() => setPayMethod("bkash")}
+                className={`py-2.5 rounded-xl text-sm font-extrabold border ${
+                  payMethod === "bkash"
+                    ? "bg-pink-600 text-white border-pink-600"
+                    : "bg-pink-50 text-pink-800 border-pink-200"
                 }`}
               >
                 বিকাশ (bKash)
               </button>
               <button
                 type="button"
-                onClick={() => setPaymentMethod('nagad')}
-                className={`py-2.5 px-3 rounded-xl font-bold text-sm border transition ${
-                  paymentMethod === 'nagad'
-                    ? 'bg-orange-600 text-white border-orange-600 shadow'
-                    : 'bg-orange-50 text-orange-700 border-orange-200'
+                onClick={() => setPayMethod("nagad")}
+                className={`py-2.5 rounded-xl text-sm font-extrabold border ${
+                  payMethod === "nagad"
+                    ? "bg-orange-600 text-white border-orange-600"
+                    : "bg-orange-50 text-orange-800 border-orange-200"
                 }`}
               >
                 নগদ (Nagad)
               </button>
             </div>
 
-            <div className={`p-4 rounded-xl border text-sm text-gray-700 space-y-2 mb-4 ${
-              paymentMethod === 'nagad' ? 'bg-orange-50 border-orange-200' : 'bg-pink-50 border-pink-200'
-            }`}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p>
-                  ১. আপনার <strong>{paymentMethod === 'nagad' ? 'নগদ (Nagad)' : 'বিকাশ (bKash)'}</strong> অ্যাপ থেকে নিচের পার্সোনাল নম্বরে <strong>৫০ টাকা (Send Money)</strong> করুন:
-                </p>
-                <a
-                  href={paymentMethod === 'nagad' ? 'https://nagad.com.bd' : 'https://www.bkash.com'}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`text-white text-xs font-bold py-1.5 px-3 rounded-lg transition ${
-                    paymentMethod === 'nagad' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-pink-600 hover:bg-pink-700'
-                  }`}
-                >
-                  {paymentMethod === 'nagad' ? '📲 নগদ অ্যাপ খুলুন' : '📲 বিকাশ অ্যাপ খুলুন'}
-                </a>
-              </div>
-              <p className={`text-center text-lg font-mono font-bold bg-white py-2 rounded-lg border ${
-                paymentMethod === 'nagad' ? 'text-orange-700' : 'text-pink-700'
-              }`}>
-                {targetWalletNumber}
+            <div className="bg-slate-100 p-3.5 rounded-xl text-xs space-y-1">
+              <p>
+                ১. নিচের নম্বরে <strong>{settings.subscriptionFee} টাকা</strong> সেন্ড মানি করুন:
               </p>
-              <p>২. টাকা পাঠানোর পর ফিরতি মেসেজ থেকে <strong>Transaction ID (TrxID)</strong> কপি করে নিচে বসান।</p>
+              <p className="text-base font-mono font-extrabold text-slate-900">
+                {payMethod === "nagad" ? settings.nagadNumber : settings.bkashNumber}
+              </p>
+              <p>২. পেমেন্টের পর Transaction ID (TrxID) ও প্রয়োজনে স্ক্রিনশট জমা দিন।</p>
             </div>
 
-            <div className="space-y-3 mb-5">
-              <div>
-                <label className="block text-gray-700 text-xs font-bold mb-1">
-                  যে {paymentMethod === 'nagad' ? 'নগদ' : 'বিকাশ'} নম্বর থেকে টাকা পাঠিয়েছেন:
-                </label>
-                <input
-                  type="tel"
-                  placeholder="01XXXXXXXXX"
-                  maxLength="11"
-                  value={senderNumber}
-                  onChange={(e) => setSenderNumber(e.target.value)}
-                  className="border rounded-xl w-full py-2.5 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-gray-700 text-xs font-bold mb-1">
-                  {paymentMethod === 'nagad' ? 'নগদ' : 'বিকাশ'} ট্রানজেকশন আইডি (TrxID):
-                </label>
-                <input
-                  type="text"
-                  placeholder="যেমন: 9H7G6F5D4S"
-                  value={trxId}
-                  onChange={(e) => 
+            <input
+              type="text"
+              value={trxIdInput}
+              onChange={(e) => setTrxIdInput(e.target.value)}
+              placeholder="Transaction ID (TrxID) লিখুন *"
+              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm uppercase font-mono"
+            />
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">
+                পেমেন্ট স্ক্রিনশট (ঐচ্ছিক)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={async (e) => {
+                  try {
+                    const url = await readFileAsDataUrl(e.target.files?.[0]);
+                    setPayScreenshot(url);
+                  } catch (err) {
+                    showToast(err.message, "error");
+                  }
+                }}
+                className="text-xs w-full"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1 bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-sm"
+              >
+                বাতিল
+              </button>
+              <button
+                type="submit"
+                disabled={submittingPayment}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-sm"
+              >
+                {submittingPayment ? "জমা হচ্ছে..." : "পেমেন্ট জমা দিন"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ==================== অভিযোগ / রিপোর্ট মডাল ==================== */}
+      {reportTarget && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSubmitReport}
+            className="bg-white rounded-2xl p-5 max-w-md w-full space-y-3 shadow-xl"
+          >
+            <h3 className="text-base font-extrabold text-slate-900">
+              রিপোর্ট করুন: {reportTarget.name}
+            </h3>
+            <textarea
+              rows={3}
+              value={reportReason}
+              onChange={(e) => setReportReason(e.target.value)}
+              placeholder="ভুয়া তথ্য, স্প্যাম বা সমস্যার কারণ লিখুন..."
+              className="w-full border border-slate-300 rounded-xl px-3 py-2.5 text-sm"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setReportTarget(null)}
+                className="flex-1 bg-slate-200 text-slate-800 font-bold py-2.5 rounded-xl text-sm"
+              >
+                বাতিল
+              </button>
+              <button
+                type="submit"
+                disabled={submittingReport}
+                className="flex-1 bg-rose-600 text-white font-extrabold py-2.5 rounded-xl text-sm"
+              >
+                {submittingReport ? "পাঠানো হচ্ছে..." : "রিপোর্ট পাঠান"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* নিচের মোবাইল নেভিগেশন বার */}
+      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-slate-200 z-30 shadow-lg">
+        <div className="max-w-5xl mx-auto grid grid-cols-5 text-center">
+          {[
+            ["home", "হোম"],
+            ["jobs", "কাজ"],
+            ["providers", "মিস্ত্রি"],
+            ["shops", "দোকান"],
+            ["profile", "অ্যাকাউন্ট"],
+          ].map(([tabKey, label]) => (
+            <button
+              key={tabKey}
+              type="button"
+              onClick={() => setActiveTab(tabKey)}
+              className={`py-3 text-xs font-extrabold transition ${
+                activeTab === tabKey
+                  ? "text-emerald-700 bg-emerald-50 border-t-2 border-emerald-700"
+                  : "text-slate-600"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {/* অ্যাডমিন প্যানেলে যাওয়ার ছোট লিংক ফুটারে */}
+      <footer className="max-w-5xl mx-auto px-4 mt-6 mb-4 text-center">
+        <button
+          type="button"
+          onClick={() => setActiveTab("admin")}
+          className="text-[11px] text-slate-400 hover:text-slate-600 underline"
+        >
+          অ্যাডমিন প্যানেল
+        </button>
+      </footer>
+    </div>
+  );
+}
