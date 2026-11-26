@@ -1180,7 +1180,10 @@ if (cleanSenderPhone.length < 10) {
             <div className="bg-slate-200 border border-slate-400 text-slate-900 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="font-extrabold text-sm">আপনার পেইড সদস্যপদ বর্তমানে সক্রিয় নয়।</p>
-                <p className="text-xs mt-1">
+               <p className="text-xs font-bold text-rose-700 mt-0.5">
+  স্ট্যাটাস: ডিসকানেক্ট
+</p>
+<p className="text-xs mt-1">
                   আপনার প্রোফাইল সংরক্ষিত আছে। {settings.subscriptionFee} টাকা / {settings.subscriptionDays} দিনের সদস্যপদ চালু করতে TrxID জমা দিন।
                 </p>
               </div>
