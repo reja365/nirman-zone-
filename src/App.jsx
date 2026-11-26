@@ -699,6 +699,10 @@ export default function App() {
     if (cleanTrx.length < 6) {
       return showToast("সঠিক Transaction ID (TrxID) লিখুন।", "error");
     }
+const cleanSenderPhone = senderPhoneInput.trim();
+if (cleanSenderPhone.length < 10) {
+  return showToast("যে নম্বর থেকে টাকা পাঠিয়েছেন সেটি লিখুন", "error");
+         }
 
     setSubmittingPayment(true);
     try {
@@ -732,6 +736,7 @@ export default function App() {
         amount: Number(settings.subscriptionFee) || 50,
         days: Number(settings.subscriptionDays) || 90,
         trxId: cleanTrx,
+        senderPhone: cleanSenderPhone,
         screenshot: payScreenshot || "",
         status: "pending", // 'pending' | 'approved' | 'rejected'
         createdAt: new Date().toISOString(),
