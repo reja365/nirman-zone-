@@ -2806,12 +2806,20 @@ export default function App() {
             </div>
 
             <input
-              type="text"
-              value={trxIdInput}
-              onChange={(e) => setTrxIdInput(e.target.value)}
-              placeholder="Transaction ID (TrxID) লিখুন *"
-              className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm uppercase font-mono"
-            />
+  type="text"
+  value={trxIdInput}
+  onChange={(e) => setTrxIdInput(e.target.value)}
+  placeholder="Transaction ID (TrxID) লিখুন *"
+  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm"
+/>
+<input
+  type="tel"
+  value={senderPhoneInput}
+  onChange={(e) => setSenderPhoneInput(e.target.value)}
+  placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন (Sender Number) *"
+  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm mb-2.5"
+/>
+
 
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
