@@ -343,6 +343,7 @@ export default function App() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [payMethod, setPayMethod] = useState("bkash"); // bkash | nagad
   const [trxIdInput, setTrxIdInput] = useState("");
+  const [senderPhoneInput, setSenderPhoneInput] = useState("");
   const [payScreenshot, setPayScreenshot] = useState("");
   const [submittingPayment, setSubmittingPayment] = useState(false);
 
