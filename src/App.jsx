@@ -105,6 +105,10 @@ const MATERIAL_CATEGORIES = [
   "বৈদ্যুতিক সামগ্রী",
   "অন্যান্য নির্মাণসামগ্রী",
 ];
+const WARD_OPTIONS = Array.from(
+  { length: 54 },
+  (_, index) => `ওয়ার্ড নং - ${index + 1}`
+);
 
 // বাংলাদেশের বিভাগ -> জেলা -> উপজেলা/থানা (প্রয়োজন অনুযায়ী আরও বাড়ানো যাবে)
 const BANGLADESH_LOCATIONS = {
