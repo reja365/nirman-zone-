@@ -2808,6 +2808,23 @@ if (cleanSenderPhone.length < 10) {
                 {payMethod === "nagad" ? settings.nagadNumber : settings.bkashNumber}
               </p>
               <p>২. পেমেন্টের পর Transaction ID (TrxID) ও প্রয়োজনে স্ক্রিনশট জমা দিন।</p>
+         <div className="pt-1">
+  {payMethod === "bkash" ? (
+    <a
+      href="intent://com.bKash.customerapp/#Intent;scheme=bKash;package=com.bKash.customerapp;end"
+      className="inline-block text-xs font-bold text-pink-700 underline"
+    >
+      বিকাশ অ্যাপ খুলুন
+    </a>
+  ) : (
+    <a
+      href="intent://com.konasl.nagad/#Intent;scheme=nagad;package=com.konasl.nagad;end"
+      className="inline-block text-xs font-bold text-orange-700 underline"
+    >
+      নগদ অ্যাপ খুলুন
+    </a>
+  )}
+</div>
             </div>
 
             <input
