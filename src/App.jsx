@@ -966,7 +966,9 @@ await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
       const st = getMembershipStatus(userItem, settings);
       if (st.isActive && !userItem.isPermanentFree) {
         // সদস্যপদ বন্ধ করা (তথ্য না মুছে মেয়াদ অতীতে সেট করা)
-        await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+        const targetDocId = userItem.id || userItem.uid || cleanPhone(userItem.phone);
+await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
+
           subscriptionExpiry: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
         });
         await writeAuditLog(settings.adminPhone, "MEMBERSHIP_DEACTIVATED", `${userItem.phone}`);
