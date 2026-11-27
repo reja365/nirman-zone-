@@ -882,8 +882,13 @@ if (cleanSenderPhone.length < 10) {
       return showToast("যাচাই কোড (OTP) সঠিক নয়।", "error");
     }
 
-    try {
-      // Firestore-এ সংরক্ষিত admin_config/security ডকুমেন্টে pinHash অথবা pin যাচাই
+        try {
+      if (!auth.currentUser) {
+        await signInAnonymously(auth);
+      }
+      await auth.currentUser.getIdToken(true);
+
+      // Firestore-এ সংরক্ষিত admin_config/security ডকুমেন্টে pinHash অথবা pin থাকতে হবে
       const secSnap = await getDoc(doc(db, "nirmanzone_admin_config", "security"));
       let validPin = false;
 
