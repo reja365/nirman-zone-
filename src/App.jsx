@@ -505,8 +505,16 @@ export default function App() {
       return showToast("এই মোবাইল নম্বর দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট খোলা আছে।", "error");
     }
 
-    setSubmittingAuth(true);
+        setSubmittingAuth(true);
     try {
+      // ১. ইউজার সাইন-ইন না থাকলে আগে সাইন-ইন করিয়ে আসল uid নেওয়া
+      let currentUser = auth.currentUser;
+      if (!currentUser) {
+        const cred = await signInAnonymously(auth);
+        currentUser = cred.user;
+      }
+      const uid = currentUser.uid;
+
       const isSpecialFree =
         regAccountType === "provider" &&
         isSpecialFreeProvider(cleaned, regProfession);
@@ -517,6 +525,7 @@ export default function App() {
           : "";
 
       const userDoc = {
+        uid: uid,
         phone: cleaned,
         fullName: regName.trim(),
         accountType: regAccountType, // 'owner' | 'provider'
@@ -539,7 +548,8 @@ export default function App() {
         createdAt: new Date().toISOString(),
       };
 
-      await setDoc(doc(db, "nirmanzone_users", cleaned), userDoc);
+      // ২. মোবাইল নম্বরের বদলে আসল uid দিয়ে সেভ করা
+      await setDoc(doc(db, "nirmanzone_users", uid), userDoc);
 
       // নির্মাণসামগ্রীর দোকান যুক্ত হলে আলাদা কালেকশনে সংরক্ষণ
       if (regAccountType === "provider" && regShopName.trim()) {
