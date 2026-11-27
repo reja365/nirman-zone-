@@ -977,7 +977,9 @@ await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
         const nextExp = new Date(
           Date.now() + Number(activateDays || 90) * 24 * 60 * 60 * 1000
         ).toISOString();
-        await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+        const targetDocId = userItem.id || userItem.uid || cleanPhone(userItem.phone);
+await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
+  
           isApproved: true,
           subscriptionExpiry: nextExp,
         });
