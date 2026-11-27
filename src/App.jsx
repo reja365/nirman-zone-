@@ -944,7 +944,9 @@ if (cleanSenderPhone.length < 10) {
     if (!isAdminAuthenticated) return;
     try {
       const nextBlock = !userItem.isBlocked;
-      await updateDoc(doc(db, "nirmanzone_users", cleanPhone(userItem.phone)), {
+      const targetDocId = userItem.id || userItem.uid || cleanPhone(userItem.phone);
+await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
+
         isBlocked: nextBlock,
       });
       await writeAuditLog(
