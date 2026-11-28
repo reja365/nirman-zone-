@@ -902,86 +902,92 @@ if (cleanSenderPhone.length < 10) {
   };
 
   // অ্যাডমিন লগইন (PIN কোডে হার্ডকোড করা নেই — Firestore admin_config থেকে যাচাই হয়)
-  const handleAdminLogin = async (e) => {
+    const handleAdminLogin = async (e) => {
     e.preventDefault();
     const now = Date.now();
     if (lockoutUntil > now) {
       const secLeft = Math.ceil((lockoutUntil - now) / 1000);
-      return showToast(`বারবার ভুল চেষ্টার কারণে লগইন সাময়িক বন্ধ। ${secLeft} সেকেন্ড পর চেষ্টা করুন।`, "error");
+      return showToast(
+        `বারবার ভুল পিন দেওয়ায় সাময়িক লক। ${secLeft} সেকেন্ড পর চেষ্টা করুন।`,
+        "error"
+      );
     }
 
     const phone = cleanPhone(adminPhoneInput);
-    const activeAdminPhone = cleanPhone(settings.adminPhone || DEFAULT_ADMIN_PHONE);
+    const activeAdminPhone = cleanPhone(settings.adminPhone || DEFAULT_SETTINGS.adminPhone);
 
     if (phone !== activeAdminPhone) {
       const nextFail = failedAdminAttempts + 1;
       setFailedAdminAttempts(nextFail);
-      if (nextFail >= 4) setLockoutUntil(Date.now() + 60 * 1000);
-      return showToast("অননুমোদিত অ্যাডমিন নম্বর।", "error");
+      if (nextFail >= 4) {
+        setLockoutUntil(Date.now() + 60 * 1000);
+        return showToast("সাময়িকভাবে লগইন লক করা হয়েছে।", "error");
+      }
+      return showToast("অ্যাডমিন নম্বর সঠিক নয়!", "error");
     }
 
-    if (!adminPinInput.trim()) {
-      return showToast("গোপন PIN লিখুন।", "error");
+    const enteredPin = String(adminPinInput || "").trim();
+    if (!enteredPin) {
+      return showToast("অনুগ্রহ করে PIN লিখুন।", "error");
     }
 
-    if (generatedOtp && adminOtpInput.trim() !== generatedOtp) {
-      return showToast("যাচাই কোড (OTP) সঠিক নয়।", "error");
+    if (generatedOtp && String(adminOtpInput || "").trim() !== String(generatedOtp).trim()) {
+      return showToast("যাচাই কোড (OTP) সঠিক নয়!", "error");
     }
 
-        try {
+    try {
       if (!auth.currentUser) {
         await signInAnonymously(auth);
       }
       await auth.currentUser.getIdToken(true);
 
-      // Firestore-এ সংরক্ষিত admin_config/security ডকুমেন্টে pinHash অথবা pin থাকতে হবে
       const secSnap = await getDoc(doc(db, "nirmanzone_admin_config", "security"));
-      let validPin = false;
-
-      if (secSnap.exists()) {
-        const data = secSnap.data();
-        const encoder = new TextEncoder();
-        const hashBuf = await crypto.subtle.digest(
-          "SHA-256",
-          encoder.encode(adminPinInput.trim())
-        );
-        const computedHash = Array.from(new Uint8Array(hashBuf))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
-
-        if (data.pinSha256 && data.pinSha256 === computedHash) {
-          validPin = true;
-        } else if (data.pin && data.pin === adminPinInput.trim()) {
-          validPin = true;
-        }
-      } else {
-        // প্রথমবার সেটআপের ক্ষেত্রে: Firestore-এ admin_config/security তৈরি করে PIN সেট করার নির্দেশনা
+      if (!secSnap.exists()) {
         return showToast(
-          "Firestore-এ nirmanzone_admin_config/security ডকুমেন্টে pinSha256 সেট করুন (কোডে PIN রাখা হয়নি)।",
+          "Firestore-এ nirmanzone_admin_config/security ডকুমেন্ট পাওয়া যায়নি।",
           "error"
         );
       }
 
-      if (!validPin) {
+      const data = secSnap.data() || {};
+      const savedPin = data.pin !== undefined && data.pin !== null ? String(data.pin).trim() : "";
+
+      const encoder = new TextEncoder();
+      const hashBuf = await crypto.subtle.digest("SHA-256", encoder.encode(enteredPin));
+      const computedHash = Array.from(new Uint8Array(hashBuf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      const isPinMatch =
+        (savedPin && savedPin === enteredPin) ||
+        (data.pinSha256 && String(data.pinSha256).trim() === computedHash);
+
+      if (!isPinMatch) {
         const nextFail = failedAdminAttempts + 1;
         setFailedAdminAttempts(nextFail);
-        await writeAuditLog(phone, "ADMIN_LOGIN_FAILED", `ভুল PIN চেষ্টা (#${nextFail})`);
+        if (typeof writeAuditLog === "function") {
+          await writeAuditLog(phone, "ADMIN_LOGIN_FAILED", `ভুল PIN চেষ্টা (#${nextFail})`);
+        }
         if (nextFail >= 4) {
           setLockoutUntil(Date.now() + 60 * 1000);
-          return showToast("৪ বার ভুল PIN দেওয়ায় ১ মিনিটের জন্য অ্যাডমিন লগইন বন্ধ রাখা হয়েছে।", "error");
+          return showToast("৪ বার ভুল PIN দেওয়ায় ১ মিনিট পর আবার লগইন করুন।", "error");
         }
-        return showToast("ভুল অ্যাডমিন PIN!", "error");
+        return showToast("ভুল PIN!", "error");
       }
 
-      setIsAdminAuthenticated(true);
       setFailedAdminAttempts(0);
+      setLockoutUntil(0);
+      setAdminAuthenticated(true);
       setAdminPinInput("");
       setAdminOtpInput("");
       setGeneratedOtp("");
-      await writeAuditLog(phone, "ADMIN_LOGIN_SUCCESS", "অ্যাডমিন প্যানেলে প্রবেশ করেছেন");
-      showToast("নিরাপদ অ্যাডমিন প্যানেলে স্বাগতম!", "success");
+      if (typeof writeAuditLog === "function") {
+        await writeAuditLog(phone, "ADMIN_LOGIN_SUCCESS", "অ্যাডমিন প্যানেলে লগইন সফল");
+      }
+      showToast("অ্যাডমিন প্যানেলে সফলভাবে লগইন হয়েছে!", "success");
     } catch (err) {
-      showToast(`অ্যাডমিন যাচাই ব্যর্থ: ${err.message}`, "error");
+      console.error("Admin login error:", err);
+      showToast(`অ্যাডমিন লগইনে সমস্যা: ${err.message || err}`, "error");
     }
   };
 
