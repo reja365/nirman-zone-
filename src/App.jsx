@@ -977,7 +977,7 @@ if (cleanSenderPhone.length < 10) {
       setFailedAdminAttempts(0);
       setLockoutUntil(0);
       setAdminAuthenticated(true);
-      setAdminPinInput("");
+      setIsAdminAuthenticated(true);
       setAdminOtpInput("");
       setGeneratedOtp("");
       if (typeof writeAuditLog === "function") {
