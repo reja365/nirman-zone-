@@ -3029,6 +3029,102 @@ await updateDoc(doc(db, "nirmanzone_users", targetDocId), {
           অ্যাডমিন প্যানেল
         </button>
       </footer>
+            {/* Terms & Privacy Policy বাটন */}
+      <div className="text-center pb-24 text-xs text-slate-500">
+        <button
+          type="button"
+          onClick={() => setShowTermsModal(true)}
+          className="underline hover:text-emerald-700 font-medium"
+        >
+          শর্তাবলি ও গোপনীয়তা নীতি (Terms & Privacy Policy)
+        </button>
+      </div>
+
+      {/* Terms & Privacy Policy পপ-আপ মোডাল */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-left">
+            {/* হেডার */}
+            <div className="flex items-center justify-between px-5 py-4 border-b bg-emerald-700 text-white">
+              <h3 className="font-bold text-base">
+                শর্তাবলি ও গোপনীয়তা নীতি (Terms & Privacy)
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="text-white/90 hover:text-white text-xl font-bold px-2"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* মূল লেখা */}
+            <div className="p-5 overflow-y-auto space-y-4 text-sm text-gray-700 leading-relaxed">
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">
+                  ১. আমাদের পরিচয় ও সেবার ধরন
+                </h4>
+                <p>
+                  "নির্মাণ-জোন" একটি ডিজিটাল প্ল্যাটফর্ম, যা গ্রাহকদের সাথে দক্ষ মিস্ত্রি ও কারিগরদের (যেমন: রাজমিস্ত্রি, গ্রিল মিস্ত্রি, ইলেকট্রিশিয়ান, প্লাম্বার, রঙমিস্ত্রি ইত্যাদি) সরাসরি যোগাযোগ স্থাপন করে দেয়। আমরা সরাসরি কোনো নির্মাণকাজের ঠিকাদার নই; কেবল তথ্য ও যোগাযোগের মাধ্যম হিসেবে কাজ করি।
+                </p>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">
+                  ২. নিবন্ধন ও সাবস্ক্রিপশন ফি
+                </h4>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>মিস্ত্রি বা কারিগর হিসেবে প্রোফাইল তালিকাভুক্ত করার জন্য নির্ধারিত সাবস্ক্রিপশন ফি প্রযোজ্য হতে পারে।</li>
+                  <li>বিকাশ বা নগদের মাধ্যমে পেমেন্ট করার পর সঠিক Transaction ID (TrxID) প্রদান করতে হবে। অ্যাডমিন যাচাইয়ের পর প্রোফাইল সক্রিয় করা হয়।</li>
+                  <li>ভুল তথ্য বা ভুয়া Transaction ID প্রদান করলে প্রোফাইল বাতিল বা ব্লক করার অধিকার কর্তৃপক্ষ সংরক্ষণ করে।</li>
+                  <li>সাবস্ক্রিপশন একবার সক্রিয় হয়ে গেলে সেই ফি অফেরতযোগ্য (Non-refundable)।</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">
+                  ৩. গ্রাহক ও মিস্ত্রির দায়বদ্ধতা
+                </h4>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>কাজের মজুরি, উপকরণের মান ও কাজের সময়সীমা গ্রাহক এবং মিস্ত্রি নিজেদের মধ্যে আলোচনা করে ঠিক করে নেবেন।</li>
+                  <li>কোনো আর্থিক লেনদেন বা কাজের মান সংক্রান্ত ব্যক্তিগত মতবিরোধের দায় "নির্মাণ-জোন" বহন করবে না। তবে প্রতারণা বা অসদাচরণের অভিযোগ প্রমাণিত হলে প্রোফাইল স্থায়ীভাবে বন্ধ করা হবে।</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">
+                  ৪. তথ্যের গোপনীয়তা (Privacy Policy)
+                </h4>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>ব্যবহারকারীর নাম, মোবাইল নম্বর, পেশা ও এলাকার তথ্য শুধুমাত্র প্রোফাইল প্রদর্শন ও যোগাযোগ সহজ করার জন্য সংগ্রহ করা হয়।</li>
+                  <li>আপনার ব্যক্তিগত তথ্য কোনো তৃতীয় পক্ষের (Third-party) কাছে বিক্রি বা হস্তান্তর করা হয় না।</li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-gray-900 mb-1">
+                  ৫. যোগাযোগ ও সহায়তা
+                </h4>
+                <p>
+                  যেকোনো প্রয়োজনে বা অভিযোগ জানাতে আমাদের হেল্পলাইন নম্বরে যোগাযোগ করুন:{" "}
+                  <span className="font-bold text-emerald-700">01920098430</span>
+                </p>
+              </div>
+            </div>
+
+            {/* ফুটার বাটন */}
+            <div className="px-5 py-3 border-t bg-gray-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowTermsModal(false)}
+                className="px-5 py-2 bg-emerald-700 text-white text-sm font-semibold rounded-lg hover:bg-emerald-800"
+              >
+                বুঝেছি ও বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
