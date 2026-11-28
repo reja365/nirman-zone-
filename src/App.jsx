@@ -900,7 +900,6 @@ if (cleanSenderPhone.length < 10) {
       setSubmittingReport(false);
     }
   };
-
   // অ্যাডমিন লগইন (PIN কোডে হার্ডকোড করা নেই — Firestore admin_config থেকে যাচাই হয়)
     const handleAdminLogin = async (e) => {
     e.preventDefault();
