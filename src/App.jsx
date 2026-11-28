@@ -23,14 +23,27 @@ import {
 // ==========================================
 // ১. FIREBASE CONFIGURATION (আপনার প্রজেক্টের আসল তথ্য বসান)
 // ==========================================
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyB02LNJfuOva_WN3QMF9EZbSx01W0fx8z8",
+  apiKey: "AIzaSyB02LNjfuOva_WN3QMF9EZbSx01W8fxBz8",
   authDomain: "nirman-zone.firebaseapp.com",
   projectId: "nirman-zone",
   storageBucket: "nirman-zone.firebasestorage.app",
   messagingSenderId: "964321389020",
   appId: "1:964321389020:web:b0c286a4cb41bda16bc719",
+  measurementId: "G-52ZMXCD67F"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
