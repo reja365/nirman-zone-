@@ -409,7 +409,8 @@ export default function App() {
 
   // অ্যাডমিন সেটিংস স্টেট
   const [editSettings, setEditSettings] = useState(DEFAULT_SETTINGS);
-
+  const [showTermsModal, setShowTermsModal] = useState(false);
+                                                       
   const showToast = (text, type = "info") => {
     setToast({ text, type });
     setTimeout(() => setToast(null), 4200);
